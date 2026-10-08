@@ -1,5 +1,6 @@
 import {all,one,stmt,database,bucket,fail,uid,now,string,number,integer,jsonBody,reply,log} from './server';
 import {teacher,ownCourse,hashPassword,passwordValid,digest,type User} from './auth';
+import {subjectPlan} from './subjects-server';
 import {getState} from './state';
 import {parseRubric,rubricScore} from './rubrics';
 import {validateRestore,commitRestore} from './restore-server';
@@ -32,7 +33,7 @@ export async function extendedRoute(r:Request,u:User,path:string,method:string):
  }
  if(path==='copy-course'&&method==='POST'){
   teacher(u);const b=await jsonBody(r),c=await ownCourse(u,b.courseId);if(!await one('SELECT id FROM periods WHERE id=?',b.periodId))fail(404,'ไม่พบภาคเรียนปลายทาง');const days=integer(b.shiftDays,'จำนวนวันเลื่อนกำหนดส่ง',-3650,3650),id=uid();const assignments=await all('SELECT * FROM assignments WHERE course_id=?',c.id),samples=await all('SELECT * FROM files WHERE course_id=? AND student_id IS NULL',c.id),ids=new Map(assignments.map(a=>[a.id,uid()]));const copied:any[]=[];
-  const ops=[stmt('INSERT INTO courses (id,period_id,owner_id,code,name,classroom,work_weight,mid_weight,final_weight,published,archived,revision) VALUES (?,?,?,?,?,?,?,?,?,0,0,0)',id,b.periodId,u.id,string(b.code,'รหัสวิชา',30),string(b.name,'ชื่อวิชา',100),string(b.classroom,'ห้อง',40),c.work_weight,c.mid_weight,c.final_weight)];
+  const parent=await subjectPlan(u,b);const ops=[...parent.ops,stmt('INSERT INTO courses (id,subject_id,period_id,owner_id,code,name,classroom,work_weight,mid_weight,final_weight,published,archived,revision) VALUES (?,?,?,?,?,?,?,?,?,?,0,0,0)',id,parent.id,b.periodId,u.id,string(b.code,'รหัสวิชา',30),string(b.name,'ชื่อวิชา',100),string(b.classroom,'ห้อง',40),c.work_weight,c.mid_weight,c.final_weight)];
   for(const a of assignments)ops.push(stmt('INSERT INTO assignments (id,course_id,title,description,max_score,due_at,rubric,created_at) VALUES (?,?,?,?,?,?,?,?)',ids.get(a.id),id,a.title,a.description,a.max_score,new Date(new Date(a.due_at).getTime()+days*86400000).toISOString(),a.rubric,now()));
   try{for(const f of samples){const object=await bucket().get(f.id);if(!object)fail(409,`ไฟล์ตัวอย่าง ${f.name} หายไป ไม่คัดลอกชุดที่ไม่ครบ`);const key=uid();await bucket().put(key,object.body,{httpMetadata:{contentType:f.mime}});copied.push(key);ops.push(stmt('INSERT INTO files (id,course_id,assignment_id,student_id,revision,kind,name,mime,size,created_at) VALUES (?,?,?,NULL,0,?,?,?,?,?)',key,id,ids.get(f.assignment_id),'work',f.name,f.mime,f.size,now()));}if(b.copyRoster){for(const e of await all('SELECT * FROM enrollments WHERE course_id=? AND active=1',c.id))ops.push(stmt("INSERT INTO enrollments (id,course_id,student_id,student_code,name,number,active,special) VALUES (?,?,?,?,?,?,1,'')",uid(),id,e.student_id,e.student_code,e.name,e.number));}await database().batch(ops);}catch(e){await Promise.all(copied.map(key=>bucket().delete(key)));if((e as any).status)throw e;fail(409,'รายวิชา/ห้องนี้มีแล้ว หรือคัดลอกไม่ได้ ไม่มีคะแนนเดิมถูกแก้ไข');}await log(u.id,id,'copy_course',{from:c.id,shiftDays:days,copyRoster:!!b.copyRoster});return reply({id},201);
  }

@@ -17,5 +17,6 @@ export async function getState(u:User){
  const people=u.role==='admin'?await all("SELECT id,username,name,role,active,must_change FROM users WHERE role!='student' ORDER BY name"):[];
  const profiles=student?[]:await all('SELECT * FROM sgs_profiles WHERE owner_id=? ORDER BY created_at DESC',u.id);
  const history=student?[]:await all(`SELECT a.*,u.name actor_name FROM audit a JOIN users u ON u.id=a.actor_id JOIN courses c ON c.id=a.course_id WHERE ${scope} ORDER BY a.created_at DESC LIMIT 500`,...args);
- return {user:u,courses,periods,assignments,enrollments,submissions,files,students,extensions,staff,people,profiles,history};
+ const subjects=await all(`SELECT DISTINCT s.* FROM subjects s JOIN courses c ON c.subject_id=s.id WHERE ${scope} ORDER BY s.name`,...args);
+ return {user:u,subjects,courses,periods,assignments,enrollments,submissions,files,students,extensions,staff,people,profiles,history};
 }

@@ -2,6 +2,16 @@
 
 เว็บภาษาไทยสำหรับผู้ดูแล ครูผู้สอนหลายคน ครูประจำชั้น และนักเรียน รองรับหลายวิชาและหลายห้อง นักเรียนมีบัญชีแยกกัน ฐานข้อมูล Cloudflare D1 และไฟล์ Cloudflare R2 ใช้งานได้หลายปีและหลายภาคเรียน
 
+## รายวิชาหลายห้องและดีไซน์ใหม่
+
+หนึ่งรายวิชาต่อปี/เทอมมีหลายห้องได้ เช่น ว21101 วิทยาศาสตร์ มี ม.1/1, ม.1/2 และ ม.1/3 สร้างพร้อมกันโดยคั่นชื่อห้องด้วยจุลภาค หรือเพิ่มห้องจากรายวิชาเดิมภายหลัง ตัวเลือก “รายวิชา” และ “ห้องเรียน” แยกกัน ดูภาพรวมทุกห้องหรือเลือกห้องเดียวได้
+
+เมื่อมอบหมายงานใหม่ เลือกห้องที่มีสิทธิ์แก้ไขได้หลายห้องในครั้งเดียว คำชี้แจง เกณฑ์และไฟล์ตัวอย่างไปถึงทุกห้องที่เลือก งานของแต่ละห้องแก้วันส่งและคะแนนแยกกันได้ การแก้งานเดิมมีผลเฉพาะห้องที่เลือก รายชื่อ คะแนนสอบ งานส่ง ผลเผยแพร่และไฟล์ยังแยกตามห้อง การคัดลอกไปเทอมใหม่คัดลอกห้องที่กำลังเปิดอยู่
+
+Migration 0003 จัดกลุ่มห้องเดิมตามเจ้าของ ปี/เทอมและรหัสวิชา คง ID ห้อง รายชื่อ งานส่งและคะแนนเดิม ZIP สำรองรุ่น 2 เก็บโครงสร้างรายวิชาหลายห้องด้วย กู้คืน ZIP รุ่น 2 เก่าที่ไม่มีโครงสร้างใหม่ได้
+
+ดีไซน์นำแนวฟองสีลอยและโทนม่วง–ชมพู–พีชจาก [Projet Bulles](https://experience.projetbulles.com/) มาปรับเป็นการ์ดรายวิชาและปุ่มเลือกห้องที่ใช้งานจริง พร้อมพื้นผิวโปร่งใสและลดการเคลื่อนไหวตามการตั้งค่าเครื่อง
+
 ## ความสามารถ
 
 - นักเรียนส่งรูป JPG/PNG/WEBP หรือ PDF/DOCX/XLSX แนบได้ 5 ไฟล์ ไฟล์ละ 10 MB รวม 25 MB
@@ -71,6 +81,7 @@ npm run build
 node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0000_secret_aaron_stack.sql
 node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0001_green_wallop.sql
 node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0002_cooing_nightshade.sql
+node --import ./scripts/sites-env.mjs ./node_modules/wrangler/bin/wrangler.js d1 execute DB --local --config dist/server/wrangler.json --persist-to .wrangler/state --file drizzle/0003_fresh_loa.sql
 npm run dev
 ```
 
@@ -83,6 +94,7 @@ Sites อ่าน `.openai/hosting.json` สำหรับ D1/R2 และใ�
 ```sh
 node node_modules/typescript/bin/tsc --noEmit
 node tests/built-worker.mjs  # Worker ที่ build แล้ว + ฐานข้อมูลจำลองแยก
+node tests/subject-migration.mjs
 node tests/enhancement-logic.mjs
 node tests/build-tests.mjs
 node tests/grades-and-export.mjs

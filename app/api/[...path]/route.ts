@@ -1,5 +1,6 @@
 import { all, one, stmt, database, bucket, HttpError, fail, uid, now, string, number, integer, jsonBody, reply, ensureSameOrigin, log } from '@/lib/server';
 import { currentUser, requireUser, teacher, ownCourse, hashPassword, matches, passwordValid, session, cookie, digest, type User } from '@/lib/auth';
+import {createSections,subjectRoute} from '@/lib/subjects-server';
 import { getState } from '@/lib/state';
 import { extendedRoute } from '@/lib/extended-server';
 import { parseRubric,validateRubric,rubricScore } from '@/lib/rubrics';
@@ -55,6 +56,7 @@ async function handle(r:Request){
   const hash=await hashPassword(passwordValid(b.password));await database().batch([stmt('UPDATE users SET password=?,must_change=0 WHERE id=?',hash,u.id),stmt('DELETE FROM sessions WHERE user_id=?',u.id)]);return reply({ok:true},200,{'Set-Cookie':await session(r,u.id)});
  }
  if(u.must_change)fail(403,'กรุณาเปลี่ยนรหัสผ่านชั่วคราวก่อนใช้งาน');
+ const subjectResponse=await subjectRoute(r,u,path,method);if(subjectResponse)return subjectResponse;
  const extra=await extendedRoute(r,u,path,method);if(extra)return extra;
  if(path==='state'&&method==='GET')return reply(await getState(u));
  if(path.startsWith('file/')&&method==='GET'){
@@ -63,19 +65,14 @@ async function handle(r:Request){
   return new Response(obj.body,{headers:{'Content-Type':f!.mime,'Content-Length':String(f!.size),'Content-Disposition':`${inline?'inline':'attachment'}; filename*=UTF-8''${encodeURIComponent(f!.name)}`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox"}});
  }
  if(path==='periods'&&method==='POST'){teacher(u);const b=await jsonBody(r);const year=integer(b.year,'ปีการศึกษา',2500,2700);const term=integer(b.term,'เทอม',1,3);const id=uid();try{await stmt('INSERT INTO periods (id,owner_id,year,term) VALUES (?,?,?,?)',id,u.id,year,term).run();}catch{fail(409,'มีปีการศึกษาและเทอมนี้แล้ว');}return reply({id},201);}
- if(path==='courses'&&method==='POST'){
-  teacher(u);const b=await jsonBody(r);if(!await one('SELECT id FROM periods WHERE id=?',b.periodId))fail(404,'ไม่พบภาคเรียน');
-  const id=uid();const code=string(b.code,'รหัสวิชา',30),name=string(b.name,'ชื่อวิชา',100),classroom=string(b.classroom,'ห้องเรียน',40);
-  const w=number(b.workWeight,'คะแนนเก็บ'),m=number(b.midWeight,'กลางภาค'),f=number(b.finalWeight,'ปลายภาค');if(Math.abs(w+m+f-100)>.0001)fail(400,'สัดส่วนคะแนนต้องรวมเป็น 100');
-  try{await stmt('INSERT INTO courses (id,period_id,owner_id,code,name,classroom,work_weight,mid_weight,final_weight,published,archived) VALUES (?,?,?,?,?,?,?,?,?,0,0)',id,b.periodId,u.id,code,name,classroom,w,m,f).run();}catch{fail(409,'มีรหัสวิชาและห้องเรียนนี้ในเทอมนี้แล้ว');}return reply({id},201);
- }
+ if(path==='courses'&&method==='POST'){teacher(u);return reply(await createSections(u,await jsonBody(r)),201);}
  if(path.startsWith('courses/')&&method==='PATCH'){
   teacher(u);const id=path.slice(8);const c=await ownCourse(u,id,true);const b=await jsonBody(r);
   if(typeof b.published==='boolean'){
    if(b.published){const state=await getState(u);const enrolls=state.enrollments.filter(e=>e.course_id===id&&e.active);if(!enrolls.length)fail(409,'ยังไม่มีนักเรียน');if(enrolls.some(e=>!calculateGrade(c,state.assignments,state.submissions,e).complete))fail(409,'ตรวจงานที่ส่งให้ครบและกรอกคะแนนสอบก่อนเผยแพร่ หรือระบุสถานะ ร / มส');}
    const changed=await stmt('UPDATE courses SET published=? WHERE id=? AND revision=?',b.published?1:0,id,c.revision).run();if(!changed.meta.changes)fail(409,'ข้อมูลเปลี่ยนระหว่างเผยแพร่ กรุณาตรวจสอบแล้วลองใหม่');await log(u.id,id,'publication',{published:b.published});
   }else if(typeof b.archived==='boolean'){await stmt('UPDATE courses SET archived=?,revision=revision+1 WHERE id=?',b.archived?1:0,id).run();}
-  else{const w=number(b.workWeight,'คะแนนเก็บ'),m=number(b.midWeight,'กลางภาค'),f=number(b.finalWeight,'ปลายภาค');if(w+m+f!==100)fail(400,'สัดส่วนคะแนนต้องรวมเป็น 100');if(await one('SELECT id FROM enrollments WHERE course_id=? AND (mid>? OR final>?)',id,m,f))fail(409,'คะแนนสอบเดิมเกินสัดส่วนใหม่');await stmt('UPDATE courses SET code=?,name=?,classroom=?,work_weight=?,mid_weight=?,final_weight=?,published=0,revision=revision+1 WHERE id=?',string(b.code,'รหัสวิชา',30),string(b.name,'ชื่อวิชา',100),string(b.classroom,'ห้องเรียน',40),w,m,f,id).run();}
+  else{if(c.subject_id&&(b.code!==c.code||b.name!==c.name))fail(409,'แก้ชื่อหรือรหัสวิชาในหน้ารายวิชารวม เพื่อให้ทุกห้องตรงกัน');const w=number(b.workWeight,'คะแนนเก็บ'),m=number(b.midWeight,'กลางภาค'),f=number(b.finalWeight,'ปลายภาค');if(w+m+f!==100)fail(400,'สัดส่วนคะแนนต้องรวมเป็น 100');if(await one('SELECT id FROM enrollments WHERE course_id=? AND (mid>? OR final>?)',id,m,f))fail(409,'คะแนนสอบเดิมเกินสัดส่วนใหม่');await stmt('UPDATE courses SET code=?,name=?,classroom=?,work_weight=?,mid_weight=?,final_weight=?,published=0,revision=revision+1 WHERE id=?',string(b.code,'รหัสวิชา',30),string(b.name,'ชื่อวิชา',100),string(b.classroom,'ห้องเรียน',40),w,m,f,id).run();}
   return reply({ok:true});
  }
  if(path==='students'&&method==='POST'){
@@ -109,14 +106,18 @@ async function handle(r:Request){
   await log(u.id,b.courseId,'import_students',{count:rows.length});return reply({ok:true,count:rows.length,credentials},201);
  }
  if(path==='assignments'&&method==='POST'){
-  teacher(u);const b=await jsonBody(r);const c=await openCourse(u,b.courseId);const id=uid();const max=number(b.maxScore,'คะแนนเต็ม',.1,1000);let rubric;try{rubric=validateRubric(b.rubric,max);}catch(e){fail(400,(e as Error).message);}const due=new Date(b.dueAt);if(!Number.isFinite(due.getTime()))fail(400,'วันกำหนดส่งไม่ถูกต้อง');
-  await database().batch([stmt('INSERT INTO assignments (id,course_id,title,description,max_score,due_at,rubric,created_at) VALUES (?,?,?,?,?,?,?,?)',id,c.id,string(b.title,'ชื่องาน',150),typeof b.description==='string'?b.description.slice(0,10000):'',max,due.toISOString(),JSON.stringify(rubric),now()),invalidateCourse(c.id)]);return reply({id},201);
+  teacher(u);const b=await jsonBody(r),targets=b.courseIds??[b.courseId];if(!Array.isArray(targets)||!targets.length||targets.length>50||new Set(targets).size!==targets.length)fail(400,'เลือกห้องเรียน 1–50 ห้องโดยไม่ซ้ำ');
+  const cs:any[]=[];for(const id of targets)cs.push(await openCourse(u,id));if(cs.some(c=>c.subject_id!==cs[0].subject_id))fail(400,'เลือกห้องจากรายวิชาเดียวกันเท่านั้น');
+  const max=number(b.maxScore,'คะแนนเต็ม',.1,1000);let rubric;try{rubric=validateRubric(b.rubric,max);}catch(e){fail(400,(e as Error).message);}const due=new Date(b.dueAt);if(!Number.isFinite(due.getTime()))fail(400,'วันกำหนดส่งไม่ถูกต้อง');const title=string(b.title,'ชื่องาน',150),ids=cs.map(()=>uid());
+  await database().batch(cs.flatMap((c,i)=>[stmt('INSERT INTO assignments (id,course_id,title,description,max_score,due_at,rubric,created_at) VALUES (?,?,?,?,?,?,?,?)',ids[i],c.id,title,typeof b.description==='string'?b.description.slice(0,10000):'',max,due.toISOString(),JSON.stringify(rubric),now()),invalidateCourse(c.id)]));return reply({id:ids[0],assignmentIds:ids},201);
  }
  if(path.startsWith('assignments/')&&method==='PATCH'){
   teacher(u);const id=path.slice(12);const {a,c}=await assignmentAccess(u,id,true);if(c.archived)fail(409,'รายวิชาเก็บเข้าประวัติแล้ว');const b=await jsonBody(r);const max=number(b.maxScore,'คะแนนเต็ม',.1,1000);let rubric;try{rubric=validateRubric(b.rubric??a.rubric,max);}catch(e){fail(400,(e as Error).message);}if(JSON.stringify(rubric)!==JSON.stringify(parseRubric(a.rubric))&&await one('SELECT id FROM submissions WHERE assignment_id=? AND status=?',id,'graded'))fail(409,'มีคะแนนแล้ว กรุณาสร้างงานใหม่เพื่อเปลี่ยนเกณฑ์');if(await one('SELECT id FROM submissions WHERE assignment_id=? AND score>?',id,max))fail(409,'มีคะแนนที่ตรวจแล้วเกินคะแนนเต็มใหม่');const due=new Date(b.dueAt);if(!Number.isFinite(due.getTime()))fail(400,'วันกำหนดส่งไม่ถูกต้อง');await database().batch([stmt('UPDATE assignments SET title=?,description=?,max_score=?,due_at=?,rubric=? WHERE id=?',string(b.title,'ชื่องาน',150),typeof b.description==='string'?b.description.slice(0,10000):'',max,due.toISOString(),JSON.stringify(rubric),a.id),invalidateCourse(c.id)]);return reply({ok:true});
  }
  if(path==='samples'&&method==='POST'){
-  teacher(u);const form=await r.formData();const {a,c}=await assignmentAccess(u,String(form.get('assignmentId')),true);if(c.archived)fail(409,'รายวิชาเก็บเข้าประวัติแล้ว');const fs=await saveUploads(form,a,u,0,true);if(!fs.length)fail(400,'กรุณาแนบไฟล์');try{await database().batch(fs.map(insertFile));}catch(e){await Promise.all(fs.map(f=>bucket().delete(f.id)));throw e;}return reply({ok:true},201);
+  teacher(u);const form=await r.formData();let targets;try{targets=form.has('assignmentIds')?JSON.parse(String(form.get('assignmentIds'))):[String(form.get('assignmentId'))];}catch{fail(400,'รายการงานไม่ถูกต้อง');}if(!Array.isArray(targets)||!targets.length||targets.length>50||new Set(targets).size!==targets.length)fail(400,'รายการงานไม่ถูกต้อง');
+  const permitted:any[]=[];for(const id of targets){const access=await assignmentAccess(u,id,true);if(access.c.archived)fail(409,'รายวิชาเก็บเข้าประวัติแล้ว');permitted.push(access);}if(permitted.some(x=>x.c.subject_id!==permitted[0].c.subject_id))fail(400,'เลือกงานจากวิชาเดียวกัน');
+  const fs=[];try{for(const {a} of permitted)fs.push(...await saveUploads(form,a,u,0,true));if(!fs.length)fail(400,'กรุณาแนบไฟล์');await database().batch(fs.map(insertFile));}catch(e){await Promise.all(fs.map(f=>bucket().delete(f.id)));throw e;}return reply({ok:true},201);
  }
  if(path==='submit'&&method==='POST'){
   if(u.role!=='student')fail(403,'เฉพาะนักเรียนเท่านั้น');const form=await r.formData();const {a,c}=await assignmentAccess(u,String(form.get('assignmentId')));if(c.archived||c.published)fail(409,'รายวิชานี้ปิดรับงานแล้ว');
