@@ -1,9 +1,10 @@
 import {all} from './server';
 import type {User} from './auth';
-export function scopeFor(u:User){return u.role==='admin'?{sql:'1=1',args:[] as unknown[]}:u.role==='student'?{sql:'EXISTS (SELECT 1 FROM enrollments access WHERE access.course_id=c.id AND access.student_id=? AND access.active=1)',args:[u.id]}:{sql:'(c.owner_id=? OR EXISTS (SELECT 1 FROM course_staff access WHERE access.course_id=c.id AND access.user_id=?))',args:[u.id,u.id]};}
+export function scopeFor(u:User){return u.role==='admin'?{sql:'1=1',args:[] as unknown[]}:u.role==='student'?{sql:'EXISTS (SELECT 1 FROM enrollments access WHERE access.course_id=c.id AND access.student_id=? AND access.active=1 AND NOT EXISTS(SELECT 1 FROM trash_entries t WHERE t.kind="enrollment" AND t.record_id=access.id))',args:[u.id]}:{sql:'(c.owner_id=? OR EXISTS (SELECT 1 FROM course_staff access WHERE access.course_id=c.id AND access.user_id=?))',args:[u.id,u.id]};}
 export async function getState(u:User){
  const {sql:scope,args}=scopeFor(u),student=u.role==='student';
- const courses=await all(`SELECT c.* FROM courses c WHERE ${scope} ORDER BY c.rowid DESC`,...args);
+ const deleted=new Set((await all('SELECT kind,record_id FROM trash_entries')).map(t=>`${t.kind}:${t.record_id}`));const live=(kind:string,id:string)=>!deleted.has(`${kind}:${id}`);
+ const courses=(await all(`SELECT c.* FROM courses c WHERE ${scope} ORDER BY c.rowid DESC`,...args)).filter(c=>live('course',c.id)&&live('period',c.period_id)&&live('subject',c.subject_id));
  for(const c of courses){if(!c.archived&&c.grading_mode==='weighted')c.published=0;}
  for(const c of courses)c.can_edit=u.role==='admin'||c.owner_id===u.id||(u.role==='teacher'&&!!await all('SELECT id FROM course_staff WHERE course_id=? AND user_id=? AND permission=?',c.id,u.id,'edit').then(x=>x.length));
  const periods=student?await all(`SELECT DISTINCT p.* FROM periods p JOIN courses c ON c.period_id=p.id WHERE ${scope} ORDER BY p.year DESC,p.term DESC`,...args):await all('SELECT * FROM periods ORDER BY year DESC,term DESC');
@@ -13,11 +14,12 @@ export async function getState(u:User){
  const files=await all(`SELECT f.* FROM files f JOIN courses c ON c.id=f.course_id WHERE ${scope} ${student?'AND (f.student_id IS NULL OR f.student_id=?)':''}`,...args,...(student?[u.id]:[]));
  const extensions=await all(`SELECT x.* FROM extensions x JOIN assignments a ON a.id=x.assignment_id JOIN courses c ON c.id=a.course_id WHERE ${scope} ${student?'AND x.student_id=?':''}`,...args,...(student?[u.id]:[]));
  if(student)for(const e of enrollments)if(!courses.find(c=>c.id===e.course_id)?.published){e.mid=null;e.final=null;e.special='';}
- const students=student?[]:await all(`SELECT DISTINCT u.id,u.username,u.name,u.active,u.must_change FROM users u JOIN enrollments e ON e.student_id=u.id JOIN courses c ON c.id=e.course_id WHERE ${scope} ORDER BY u.username`,...args);
+ const students=student?[]:u.role==='admin'?await all("SELECT id,username,name,active,must_change FROM users WHERE role='student' ORDER BY username"):await all(`SELECT DISTINCT u.id,u.username,u.name,u.active,u.must_change FROM users u JOIN enrollments e ON e.student_id=u.id JOIN courses c ON c.id=e.course_id WHERE ${scope} ORDER BY u.username`,...args);
  const staff=student?[]:await all(`SELECT cs.*,u.name,u.username,u.role FROM course_staff cs JOIN users u ON u.id=cs.user_id JOIN courses c ON c.id=cs.course_id WHERE ${scope}`,...args);
  const people=u.role==='admin'?await all("SELECT id,username,name,role,active,must_change FROM users WHERE role!='student' ORDER BY name"):[];
  const profiles=student?[]:await all('SELECT * FROM sgs_profiles WHERE owner_id=? ORDER BY created_at DESC',u.id);
  const history=student?[]:await all(`SELECT a.*,u.name actor_name FROM audit a JOIN users u ON u.id=a.actor_id JOIN courses c ON c.id=a.course_id WHERE ${scope} ORDER BY a.created_at DESC LIMIT 500`,...args);
- const subjects=await all(`SELECT DISTINCT s.* FROM subjects s JOIN courses c ON c.subject_id=s.id WHERE ${scope} ORDER BY s.name`,...args);
- return {user:u,subjects,courses,periods,assignments,enrollments,submissions,files,students,extensions,staff,people,profiles,history};
+ const subjects=await all(`SELECT DISTINCT s.* FROM subjects s LEFT JOIN courses c ON c.subject_id=s.id WHERE (${scope}) OR s.owner_id=? ORDER BY s.name`,...args,u.id);
+ const courseIds=new Set(courses.map(c=>c.id));const activeAssignments=assignments.filter(a=>courseIds.has(a.course_id)&&live('assignment',a.id));const taskIds=new Set(activeAssignments.map(a=>a.id));const activeEnrolls=enrollments.filter(e=>courseIds.has(e.course_id)&&live('enrollment',e.id)&&live('student',e.student_id));const enrolled=new Set(activeEnrolls.map(e=>`${e.course_id}:${e.student_id}`));const belongs=(a:string,s:string)=>enrolled.has(`${activeAssignments.find(x=>x.id===a)?.course_id}:${s}`);
+ return {user:u,subjects:subjects.filter(s=>live('subject',s.id)&&live('period',s.period_id)),courses,periods:periods.filter(p=>live('period',p.id)),assignments:activeAssignments,enrollments:activeEnrolls,submissions:submissions.filter(s=>taskIds.has(s.assignment_id)&&live('submission',s.id)&&belongs(s.assignment_id,s.student_id)),files:files.filter(f=>taskIds.has(f.assignment_id)&&live('file',f.id)&&(!f.student_id||belongs(f.assignment_id,f.student_id))),students:students.filter(s=>live('student',s.id)&&(u.role==='admin'||activeEnrolls.some(e=>e.student_id===s.id))),extensions:extensions.filter(x=>taskIds.has(x.assignment_id)&&live('extension',x.id)&&belongs(x.assignment_id,x.student_id)),staff:staff.filter(s=>courseIds.has(s.course_id)),people,profiles:profiles.filter(p=>live('profile',p.id)),history:history.filter(h=>courseIds.has(h.course_id))};
 }

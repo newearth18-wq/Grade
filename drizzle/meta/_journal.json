@@ -36,6 +36,20 @@
       "when": 1791456015670,
       "tag": "0004_melodic_chronomancer",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1791457542984,
+      "tag": "0005_fixed_the_twelve",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1791466565369,
+      "tag": "0006_absent_swordsman",
+      "breakpoints": true
     }
   ]
 }

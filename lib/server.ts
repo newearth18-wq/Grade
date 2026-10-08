@@ -5,6 +5,8 @@ export function bucket():R2Bucket {if(!env.BUCKET) throw new HttpError(503,'พ�
 export function stmt(sql:string,...args:unknown[]){return database().prepare(sql).bind(...args);}
 export async function one<T=Record<string,any>>(sql:string,...args:unknown[]){return stmt(sql,...args).first<T>();}
 export async function all<T=Record<string,any>>(sql:string,...args:unknown[]){return (await stmt(sql,...args).all<T>()).results;}
+export async function isTrashed(kind:string,id:string){return !!await one('SELECT record_id FROM trash_entries WHERE kind=? AND record_id=?',kind,id);}
+export async function requireLive(kind:string,id:string){if(await isTrashed(kind,id))fail(404,'ข้อมูลอยู่ในถังขยะ กรุณากู้คืนก่อนใช้งาน');}
 export const uid=()=>crypto.randomUUID();
 export const now=()=>new Date().toISOString();
 export function fail(status:number,message:string):never {throw new HttpError(status,message);}
