@@ -1,0 +1,26 @@
+'use client';
+import { useState } from 'react';
+import { Download, Eye, EyeOff, Save } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { api,type AppState,type Row } from '@/lib/client';
+import { calculateGrade } from '@/lib/grades';
+import { exportWorkbook,resultRows } from '@/lib/files-client';
+import { Choice,DataTable,Empty,BusyButton } from './shared';
+export function Results({state,course,refresh}:{state:AppState;course:Row;refresh:()=>Promise<void>}){
+ const [busy,setBusy]=useState(false),[error,setError]=useState('');const teacher=state.user.role==='teacher';const enrolls=state.enrollments.filter(e=>e.course_id===course.id&&e.active);
+ async function publication(){setBusy(true);setError('');try{await api(`courses/${course.id}`,{published:!course.published},'PATCH');await refresh();}catch(e){setError((e as Error).message);}finally{setBusy(false);}}
+ return <><div className="panel result-summary"><div><h2>{course.name} <span className="muted">{course.classroom}</span></h2><p className="muted">คะแนนเก็บ {course.work_weight} · กลางภาค {course.mid_weight} · ปลายภาค {course.final_weight}</p></div><div className="row"><span className={`badge ${course.published?'green':'amber'}`}>{course.published?'เผยแพร่แล้ว':'ยังไม่เผยแพร่'}</span>{teacher&&<><Button variant="outline" onClick={async()=>{try{await exportWorkbook(resultRows(state,course),`ผลการเรียน-${course.code}-${course.classroom.replaceAll('/','-')}.xlsx`,'ผลการเรียน');}catch(e){setError((e as Error).message);}}}><Download size={16}/> Excel</Button><BusyButton busy={busy} onClick={publication} disabled={!!course.archived}>{course.published?<EyeOff size={16}/>:<Eye size={16}/>} {course.published?'ยกเลิกเผยแพร่':'เผยแพร่ผลการเรียน'}</BusyButton></>}</div></div>{error&&<p className="error" role="alert">{error}</p>}
+ {!teacher&&!course.published?<section className="panel"><Empty title="ครูยังไม่เผยแพร่ผลการเรียน" description="คะแนนรายงานที่ตรวจแล้วดูได้ในหน้างานของฉัน"/></section>:!enrolls.length?<section className="panel"><Empty title="ยังไม่มีนักเรียนในรายวิชานี้"/></section>:<section className="panel table-panel"><DataTable headers={['เลขที่','นักเรียน',`คะแนนเก็บ / ${course.work_weight}`,`กลางภาค / ${course.mid_weight}`,`ปลายภาค / ${course.final_weight}`,'สถานะ','รวม / 100','เกรด',...(teacher?['']:[])]} rows={enrolls.map(e=>{const g=calculateGrade(course,state.assignments,state.submissions,e);return teacher?[e.number,<div><strong>{e.name}</strong><small className="cell-sub">{e.student_code}</small></div>,g.work,<ExamCell key={`${e.id}-mid-${e.mid}`} enrollment={e} course={course} field="mid" refresh={refresh}/>,<ExamCell key={`${e.id}-final-${e.final}`} enrollment={e} course={course} field="final" refresh={refresh}/>,<SpecialCell key={`${e.id}-${e.special}`} enrollment={e} course={course} refresh={refresh}/>,<strong>{g.complete?g.total:'—'}</strong>,<span className="grade-value">{g.grade??'รอข้อมูล'}</span>,<span className="muted">ขาด {g.missing} · รอตรวจ {g.pending}</span>]:[e.number,e.name,g.work,g.mid??'—',g.final??'—',e.special||'ปกติ',g.total,<span className="grade-value">{g.grade}</span>];})}/></section>}
+ <div className="notice"><strong>เกณฑ์เกรด</strong> 80 ขึ้นไป = 4 · 75 = 3.5 · 70 = 3 · 65 = 2.5 · 60 = 2 · 55 = 1.5 · 50 = 1 · ต่ำกว่า 50 = 0<p>คะแนนเก็บคำนวณจากคะแนนงานทั้งหมดตามสัดส่วนของวิชา งานที่ยังไม่ส่งคิดเป็น 0 เมื่อสรุปผล · งานที่รอตรวจ / แก้ไขและคะแนนสอบที่ยังไม่กรอกต้องจัดการก่อนเผยแพร่</p><p>การแก้ไขคะแนน งาน หรือการลงทะเบียนจะยกเลิกการเผยแพร่ ครูตรวจสอบแล้วกดเผยแพร่อีกครั้ง</p></div></>;
+}
+function ExamCell({enrollment:e,course:c,field,refresh}:{enrollment:Row;course:Row;field:'mid'|'final';refresh:()=>Promise<void>}){
+ const [value,setValue]=useState(e[field]===null?'':String(e[field])),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ async function save(){setBusy(true);setError('');try{await api(`enrollments/${e.id}`,{[field]:value===''?null:Number(value)},'PATCH');await refresh();}catch(err){setError((err as Error).message);}finally{setBusy(false);}}
+ return <div className="exam-cell"><div className="row"><Input aria-label={`${field==='mid'?'คะแนนกลางภาค':'คะแนนปลายภาค'} ${e.name}`} type="number" min={0} max={c[`${field}_weight`]} step={.01} value={value} disabled={!!c.archived} onChange={event=>setValue(event.target.value)}/><Button variant="ghost" size="icon" aria-label={`บันทึกคะแนน ${e.name}`} onClick={save} disabled={busy||!!c.archived||(value===''?e[field]===null:Number(value)===e[field])}><Save size={15}/></Button></div>{error&&<p className="error" role="alert">{error}</p>}</div>;
+}
+function SpecialCell({enrollment:e,course:c,refresh}:{enrollment:Row;course:Row;refresh:()=>Promise<void>}){
+ const [error,setError]=useState(''),[busy,setBusy]=useState(false);
+ return <div><Choice label={`สถานะ ${e.name}`} value={e.special} disabled={busy||!!c.archived} options={[{value:'',label:'ปกติ'},{value:'ร',label:'ร'},{value:'มส',label:'มส'}]} onChange={async v=>{setBusy(true);setError('');try{await api(`enrollments/${e.id}`,{special:v},'PATCH');await refresh();}catch(err){setError((err as Error).message);}finally{setBusy(false);}}}/>{error&&<p className="error">{error}</p>}</div>;
+}
+

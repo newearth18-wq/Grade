@@ -1,0 +1,149 @@
+import { all, one, stmt, database, bucket, HttpError, fail, uid, now, string, number, integer, jsonBody, reply, ensureSameOrigin, log } from '@/lib/server';
+import { currentUser, requireUser, teacher, ownCourse, hashPassword, matches, passwordValid, session, cookie, digest, type User } from '@/lib/auth';
+import { calculateGrade } from '@/lib/grades';
+export const dynamic='force-dynamic';
+
+async function getState(u:User){
+ const courses=u.role==='teacher'?await all('SELECT * FROM courses WHERE owner_id=? ORDER BY rowid DESC',u.id):await all('SELECT c.* FROM courses c JOIN enrollments e ON e.course_id=c.id WHERE e.student_id=? AND e.active=1 ORDER BY c.rowid DESC',u.id);
+ const scope=u.role==='teacher'?'c.owner_id=?':'EXISTS (SELECT 1 FROM enrollments access WHERE access.course_id=c.id AND access.student_id=? AND access.active=1)';
+ const periods=u.role==='teacher'?await all('SELECT * FROM periods WHERE owner_id=? ORDER BY year DESC,term DESC',u.id):await all(`SELECT DISTINCT p.* FROM periods p JOIN courses c ON c.period_id=p.id WHERE ${scope} ORDER BY p.year DESC,p.term DESC`,u.id);
+ const assignments=await all(`SELECT a.* FROM assignments a JOIN courses c ON c.id=a.course_id WHERE ${scope} ORDER BY a.due_at,a.id`,u.id);
+ const enrollments=await all(`SELECT e.* FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE ${scope} ${u.role==='student'?'AND e.student_id=?':''} ORDER BY e.number`,u.id,...(u.role==='student'?[u.id]:[]));
+ const submissions=await all(`SELECT s.* FROM submissions s JOIN assignments a ON a.id=s.assignment_id JOIN courses c ON c.id=a.course_id WHERE ${scope} ${u.role==='student'?'AND s.student_id=?':''}`,u.id,...(u.role==='student'?[u.id]:[]));
+ const files=await all(`SELECT f.* FROM files f JOIN courses c ON c.id=f.course_id WHERE ${scope} ${u.role==='student'?'AND (f.student_id IS NULL OR f.student_id=?)':''}`,u.id,...(u.role==='student'?[u.id]:[]));
+ if(u.role==='student')for(const e of enrollments){if(!courses.find(c=>c.id===e.course_id)?.published){e.mid=null;e.final=null;e.special='';}}
+ const students=u.role==='teacher'?await all('SELECT id,username,name,active,must_change FROM users WHERE role=? ORDER BY username','student'):[];
+ return {user:u,courses,periods,assignments,enrollments,submissions,files,students};
+}
+async function assignmentAccess(u:User,id:string){const a=await one('SELECT * FROM assignments WHERE id=?',id);if(!a)fail(404,'ไม่พบงาน');const c=await ownCourse(u,a!.course_id);return {a:a!,c};}
+async function openCourse(u:User,id:string){const c=await ownCourse(u,id);if(c.archived)fail(409,'รายวิชานี้เก็บเข้าประวัติแล้ว');return c;}
+async function fileBytes(f:File){
+ if(f.size<=0||f.size>10*1024*1024)fail(400,'แต่ละไฟล์ต้องมีขนาด 1 ไบต์–10 MB');
+ const data=await f.arrayBuffer();const b=new Uint8Array(data);let mime='';
+ if(b[0]===0xff&&b[1]===0xd8&&b[2]===0xff)mime='image/jpeg';
+ else if(b.slice(0,8).join(',')==='137,80,78,71,13,10,26,10')mime='image/png';
+ else if(new TextDecoder().decode(b.slice(0,4))==='RIFF'&&new TextDecoder().decode(b.slice(8,12))==='WEBP')mime='image/webp';
+ else if(new TextDecoder().decode(b.slice(0,5))==='%PDF-')mime='application/pdf';
+ else if(b[0]===80&&b[1]===75&&b[2]===3&&b[3]===4){if(/\.docx$/i.test(f.name))mime='application/vnd.openxmlformats-officedocument.wordprocessingml.document';if(/\.xlsx$/i.test(f.name))mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';}
+ if(!mime)fail(400,'รองรับรูป JPG, PNG, WEBP และไฟล์ PDF, DOCX, XLSX เท่านั้น');
+ return {data,mime};
+}
+async function saveUploads(form:FormData,a:any,u:User,revision:number,sample=false){
+ const incoming=form.getAll('files').filter((f):f is File=>f instanceof File);if(incoming.length>5)fail(400,'แนบได้ไม่เกิน 5 ไฟล์ต่อครั้ง');if(!sample&&incoming.length===0)fail(400,'กรุณาแนบรูปหรือไฟล์งาน');
+ if(incoming.reduce((n,f)=>n+f.size,0)>25*1024*1024)fail(413,'ไฟล์รวมต้องไม่เกิน 25 MB');
+ const validated=[];for(const f of incoming)validated.push({f,...await fileBytes(f)});
+ const saved:any[]=[];
+ try{for(const {f,data,mime} of validated){const id=uid();await bucket().put(id,data,{httpMetadata:{contentType:mime}});saved.push({id,course_id:a.course_id,assignment_id:a.id,student_id:sample?null:u.id,revision,name:f.name.replace(/[\x00-\x1f\x7f]/g,'').slice(0,200),mime,size:f.size,created_at:now()});}return saved;}catch(e){await Promise.all(saved.map(f=>bucket().delete(f.id)));throw e;}
+}
+function invalidateCourse(id:string){return stmt('UPDATE courses SET published=0,revision=revision+1 WHERE id=?',id);}
+function insertFile(f:any){return stmt('INSERT INTO files (id,course_id,assignment_id,student_id,revision,name,mime,size,created_at) VALUES (?,?,?,?,?,?,?,?,?)',f.id,f.course_id,f.assignment_id,f.student_id,f.revision,f.name,f.mime,f.size,f.created_at);}
+async function handle(r:Request){
+ const path=new URL(r.url).pathname.replace(/^\/api\//,'').replace(/\/$/,'');const method=r.method;
+ if(method!=='GET')ensureSameOrigin(r);
+ if(path==='auth'&&method==='GET'){const user=await currentUser(r);const setup=!(await one('SELECT value FROM settings WHERE key=?','bootstrap'));return reply({user,setup});}
+ if(path==='setup'&&method==='POST'){
+  const b=await jsonBody(r);const name=string(b.name,'ชื่อครู',100);const username=string(b.username,'ชื่อผู้ใช้',40);if(!/^[a-zA-Z0-9_.-]{3,40}$/.test(username))fail(400,'ชื่อผู้ใช้ต้องมี 3–40 ตัวอักษรอังกฤษ ตัวเลข หรือ . _ -');
+  if(await one('SELECT value FROM settings WHERE key=?','bootstrap'))fail(409,'ระบบมีบัญชีครูแล้ว กรุณาเข้าสู่ระบบ');
+  const password=await hashPassword(passwordValid(b.password));const id=uid();
+  try{await database().batch([stmt('INSERT INTO settings (key,value) VALUES (?,?)','bootstrap',id),stmt('INSERT INTO users (id,username,name,role,password,active,must_change,created_at) VALUES (?,?,?,?,?,1,0,?)',id,username,name,'teacher',password,now())]);}catch{fail(409,'ระบบได้รับการตั้งค่าแล้ว กรุณาเข้าสู่ระบบ');}
+  return reply({ok:true},201,{'Set-Cookie':await session(r,id)});
+ }
+ if(path==='login'&&method==='POST'){
+  const b=await jsonBody(r);const username=string(b.username,'ชื่อผู้ใช้',40);const p=typeof b.password==='string'?b.password:'';if(p.length>128)fail(400,'รหัสผ่านไม่ถูกต้อง');
+  const key=await digest((r.headers.get('cf-connecting-ip')||'local')+':'+username.toLowerCase());
+  await stmt('INSERT INTO login_limits (key,count,expires) VALUES (?,1,?) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN expires<? THEN 1 ELSE count+1 END, expires=CASE WHEN expires<? THEN excluded.expires ELSE expires END',key,Date.now()+900000,Date.now(),Date.now()).run();
+  const limit=await one('SELECT count FROM login_limits WHERE key=?',key);if(limit!.count>10)fail(429,'ลองเข้าสู่ระบบหลายครั้ง กรุณารอ 15 นาที');
+  const user=await one('SELECT * FROM users WHERE username=? AND active=1',username);
+  const valid=await matches(p,user?.password||'00000000000000000000000000000000:0000000000000000000000000000000000000000000000000000000000000000');if(!valid||!user)fail(401,'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
+  await stmt('DELETE FROM login_limits WHERE key=?',key).run();return reply({ok:true},200,{'Set-Cookie':await session(r,user!.id)});
+ }
+ const u=await requireUser(r);
+ if(path==='logout'&&method==='POST'){const token=r.headers.get('cookie')?.match(/(?:^|;\s*)grade_session=([^;]+)/)?.[1];if(token)await stmt('DELETE FROM sessions WHERE token=?',await digest(token)).run();return reply({ok:true},200,{'Set-Cookie':cookie(r,'',0)});}
+ if(path==='password'&&method==='POST'){
+  const b=await jsonBody(r);const row=await one('SELECT password FROM users WHERE id=?',u.id);if(typeof b.oldPassword!=='string'||!await matches(b.oldPassword,row!.password))fail(403,'รหัสผ่านเดิมไม่ถูกต้อง');
+  const hash=await hashPassword(passwordValid(b.password));await database().batch([stmt('UPDATE users SET password=?,must_change=0 WHERE id=?',hash,u.id),stmt('DELETE FROM sessions WHERE user_id=?',u.id)]);return reply({ok:true},200,{'Set-Cookie':await session(r,u.id)});
+ }
+ if(u.must_change)fail(403,'กรุณาเปลี่ยนรหัสผ่านชั่วคราวก่อนใช้งาน');
+ if(path==='state'&&method==='GET')return reply(await getState(u));
+ if(path.startsWith('file/')&&method==='GET'){
+  const f=await one('SELECT * FROM files WHERE id=?',path.slice(5));if(!f)fail(404,'ไม่พบไฟล์');await ownCourse(u,f!.course_id);if(u.role==='student'&&f!.student_id&&f!.student_id!==u.id)fail(403,'ไม่มีสิทธิ์ดูไฟล์นักเรียนคนอื่น');
+  const obj=await bucket().get(f!.id);if(!obj)fail(404,'ไม่พบไฟล์');const inline=f!.mime.startsWith('image/')||f!.mime==='application/pdf';
+  return new Response(obj.body,{headers:{'Content-Type':f!.mime,'Content-Length':String(f!.size),'Content-Disposition':`${inline?'inline':'attachment'}; filename*=UTF-8''${encodeURIComponent(f!.name)}`,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox"}});
+ }
+ if(path==='periods'&&method==='POST'){teacher(u);const b=await jsonBody(r);const year=integer(b.year,'ปีการศึกษา',2500,2700);const term=integer(b.term,'เทอม',1,3);const id=uid();try{await stmt('INSERT INTO periods (id,owner_id,year,term) VALUES (?,?,?,?)',id,u.id,year,term).run();}catch{fail(409,'มีปีการศึกษาและเทอมนี้แล้ว');}return reply({id},201);}
+ if(path==='courses'&&method==='POST'){
+  teacher(u);const b=await jsonBody(r);if(!await one('SELECT id FROM periods WHERE id=? AND owner_id=?',b.periodId,u.id))fail(404,'ไม่พบภาคเรียน');
+  const id=uid();const code=string(b.code,'รหัสวิชา',30),name=string(b.name,'ชื่อวิชา',100),classroom=string(b.classroom,'ห้องเรียน',40);
+  const w=number(b.workWeight,'คะแนนเก็บ'),m=number(b.midWeight,'กลางภาค'),f=number(b.finalWeight,'ปลายภาค');if(Math.abs(w+m+f-100)>.0001)fail(400,'สัดส่วนคะแนนต้องรวมเป็น 100');
+  try{await stmt('INSERT INTO courses (id,period_id,owner_id,code,name,classroom,work_weight,mid_weight,final_weight,published,archived) VALUES (?,?,?,?,?,?,?,?,?,0,0)',id,b.periodId,u.id,code,name,classroom,w,m,f).run();}catch{fail(409,'มีรหัสวิชาและห้องเรียนนี้ในเทอมนี้แล้ว');}return reply({id},201);
+ }
+ if(path.startsWith('courses/')&&method==='PATCH'){
+  teacher(u);const id=path.slice(8);const c=await ownCourse(u,id);const b=await jsonBody(r);
+  if(typeof b.published==='boolean'){
+   if(b.published){const state=await getState(u);const enrolls=state.enrollments.filter(e=>e.course_id===id&&e.active);if(!enrolls.length)fail(409,'ยังไม่มีนักเรียน');if(enrolls.some(e=>!calculateGrade(c,state.assignments,state.submissions,e).complete))fail(409,'ตรวจงานที่ส่งให้ครบและกรอกคะแนนสอบก่อนเผยแพร่ หรือระบุสถานะ ร / มส');}
+   const changed=await stmt('UPDATE courses SET published=? WHERE id=? AND revision=?',b.published?1:0,id,c.revision).run();if(!changed.meta.changes)fail(409,'ข้อมูลเปลี่ยนระหว่างเผยแพร่ กรุณาตรวจสอบแล้วลองใหม่');await log(u.id,id,'publication',{published:b.published});
+  }else if(typeof b.archived==='boolean'){await stmt('UPDATE courses SET archived=?,revision=revision+1 WHERE id=?',b.archived?1:0,id).run();}
+  else{const w=number(b.workWeight,'คะแนนเก็บ'),m=number(b.midWeight,'กลางภาค'),f=number(b.finalWeight,'ปลายภาค');if(w+m+f!==100)fail(400,'สัดส่วนคะแนนต้องรวมเป็น 100');if(await one('SELECT id FROM enrollments WHERE course_id=? AND (mid>? OR final>?)',id,m,f))fail(409,'คะแนนสอบเดิมเกินสัดส่วนใหม่');await stmt('UPDATE courses SET code=?,name=?,classroom=?,work_weight=?,mid_weight=?,final_weight=?,published=0,revision=revision+1 WHERE id=?',string(b.code,'รหัสวิชา',30),string(b.name,'ชื่อวิชา',100),string(b.classroom,'ห้องเรียน',40),w,m,f,id).run();}
+  return reply({ok:true});
+ }
+ if(path==='students'&&method==='POST'){
+  teacher(u);const b=await jsonBody(r);await openCourse(u,string(b.courseId,'รายวิชา'));const code=string(b.code,'รหัสนักเรียน',40);if(!/^[a-zA-Z0-9_.-]{1,40}$/.test(code))fail(400,'รหัสนักเรียนต้องเป็นตัวเลขหรือตัวอักษรอังกฤษ');const name=string(b.name,'ชื่อนักเรียน',100);const n=integer(b.number,'เลขที่',1,999);
+  let student=await one('SELECT * FROM users WHERE username=?',code);if(student&&student.role!=='student')fail(409,'รหัสนี้เป็นบัญชีครู');
+  const ops=[];let initialPassword:string|null=null;
+  if(!student){const id=uid();initialPassword=typeof b.password==='string'&&b.password?passwordValid(b.password):`Gr-${uid().slice(0,12)}`;ops.push(stmt('INSERT INTO users (id,username,name,role,password,active,must_change,created_at) VALUES (?,?,?,?,?,1,1,?)',id,code,name,'student',await hashPassword(initialPassword),now()));student={id};}
+  ops.push(stmt('INSERT INTO enrollments (id,course_id,student_id,student_code,name,number,active,special) VALUES (?,?,?,?,?,?,1,?)',uid(),b.courseId,student.id,code,name,n,''));
+  try{await database().batch([...ops,invalidateCourse(b.courseId)]);}catch{fail(409,'นักเรียนคนนี้ลงทะเบียนรายวิชานี้แล้ว');}
+  return reply({ok:true,code,initialPassword},201);
+ }
+ if(path.startsWith('enrollments/')&&method==='PATCH'){
+  teacher(u);const id=path.slice(12);const e=await one('SELECT * FROM enrollments WHERE id=?',id);if(!e)fail(404,'ไม่พบนักเรียน');const c=await openCourse(u,e!.course_id);const b=await jsonBody(r);
+  if(b.resetPassword){const password=passwordValid(b.password);await database().batch([stmt('UPDATE users SET password=?,must_change=1 WHERE id=?',await hashPassword(password),e!.student_id),stmt('DELETE FROM sessions WHERE user_id=?',e!.student_id)]);await log(u.id,c.id,'reset_password',{studentId:e!.student_id});return reply({ok:true});}
+  if('mid' in b||'final' in b||'special' in b){const mid='mid' in b?(b.mid===null?null:number(b.mid,'กลางภาค',0,c.mid_weight)):e!.mid;const final='final' in b?(b.final===null?null:number(b.final,'ปลายภาค',0,c.final_weight)):e!.final;const special='special' in b?(typeof b.special==='string'?b.special:''):e!.special;if(!['','ร','มส'].includes(special))fail(400,'สถานะผลการเรียนไม่ถูกต้อง');const columns:string[]=[];const values:unknown[]=[];if('mid' in b){columns.push('mid=?');values.push(mid);}if('final' in b){columns.push('final=?');values.push(final);}if('special' in b){columns.push('special=?');values.push(special);}await database().batch([stmt('UPDATE enrollments SET '+columns.join(',')+' WHERE id=?',...values,id),invalidateCourse(c.id)]);await log(u.id,c.id,'exam_scores',{enrollment:id,mid,final,special});}
+  else{await database().batch([stmt('UPDATE enrollments SET name=?,number=?,active=? WHERE id=?',string(b.name,'ชื่อนักเรียน',100),integer(b.number,'เลขที่',1,999),b.active===false?0:1,id),invalidateCourse(c.id)]);}
+  return reply({ok:true});
+ }
+ if(path==='enroll-existing'&&method==='POST'){
+  teacher(u);const b=await jsonBody(r);await openCourse(u,b.courseId);const e=await one('SELECT e.* FROM enrollments e JOIN courses c ON c.id=e.course_id WHERE e.id=? AND c.owner_id=?',b.enrollmentId,u.id);if(!e)fail(404,'ไม่พบข้อมูลเดิม');try{await database().batch([stmt('INSERT INTO enrollments (id,course_id,student_id,student_code,name,number,active,special) VALUES (?,?,?,?,?,?,1,?)',uid(),b.courseId,e!.student_id,e!.student_code,e!.name,e!.number,''),invalidateCourse(b.courseId)]);}catch{fail(409,'นักเรียนคนนี้ลงทะเบียนแล้ว');}return reply({ok:true});
+ }
+ if(path==='import'&&method==='POST'){
+  teacher(u);const b=await jsonBody(r);await openCourse(u,b.courseId);if(!Array.isArray(b.rows)||b.rows.length===0||b.rows.length>100)fail(400,'นำเข้าได้ครั้งละ 1–100 คน');
+  const seen=new Set<string>();const rows=b.rows.map((row:any)=>{const code=string(row.code,'รหัสนักเรียน',40);if(!/^[a-zA-Z0-9_.-]{1,40}$/.test(code)||seen.has(code))fail(400,`รหัส ${code} ไม่ถูกต้องหรือซ้ำในไฟล์`);seen.add(code);return {code,name:string(row.name,'ชื่อ',100),number:integer(row.number,'เลขที่',1,999)};});
+  const credentials=[];const ops=[];const existingUsers=new Map((await all('SELECT id,username,role FROM users')).map(s=>[s.username,s]));const registered=new Set((await all('SELECT student_code FROM enrollments WHERE course_id=?',b.courseId)).map(e=>e.student_code));
+  for(const row of rows){let s=existingUsers.get(row.code);if(s&&s.role!=='student')fail(409,`รหัส ${row.code} เป็นบัญชีครู`);if(registered.has(row.code))fail(409,`รหัส ${row.code} มีในรายวิชานี้แล้ว กรุณาแก้ไขรายชื่อหรือตัดแถวนี้ออก`);
+   if(!s){const id=uid(),p=`Gr-${uid().slice(0,12)}`;s={id};ops.push(stmt('INSERT INTO users (id,username,name,role,password,active,must_change,created_at) VALUES (?,?,?,?,?,1,1,?)',id,row.code,row.name,'student',await hashPassword(p),now()));credentials.push({code:row.code,name:row.name,password:p});}
+   ops.push(stmt('INSERT INTO enrollments (id,course_id,student_id,student_code,name,number,active,special) VALUES (?,?,?,?,?,?,1,?)',uid(),b.courseId,s!.id,row.code,row.name,row.number,''));
+  }
+  try{await database().batch([...ops,invalidateCourse(b.courseId)]);}catch{fail(409,'มีข้อมูลซ้ำหรือเปลี่ยนระหว่างนำเข้า กรุณาตรวจสอบแล้วลองใหม่');}
+  await log(u.id,b.courseId,'import_students',{count:rows.length});return reply({ok:true,count:rows.length,credentials},201);
+ }
+ if(path==='assignments'&&method==='POST'){
+  teacher(u);const b=await jsonBody(r);const c=await openCourse(u,b.courseId);const id=uid();const due=new Date(b.dueAt);if(!Number.isFinite(due.getTime()))fail(400,'วันกำหนดส่งไม่ถูกต้อง');
+  await database().batch([stmt('INSERT INTO assignments (id,course_id,title,description,max_score,due_at,created_at) VALUES (?,?,?,?,?,?,?)',id,c.id,string(b.title,'ชื่องาน',150),typeof b.description==='string'?b.description.slice(0,10000):'',number(b.maxScore,'คะแนนเต็ม',.1,1000),due.toISOString(),now()),invalidateCourse(c.id)]);return reply({id},201);
+ }
+ if(path.startsWith('assignments/')&&method==='PATCH'){
+  teacher(u);const id=path.slice(12);const {a,c}=await assignmentAccess(u,id);if(c.archived)fail(409,'รายวิชาเก็บเข้าประวัติแล้ว');const b=await jsonBody(r);const max=number(b.maxScore,'คะแนนเต็ม',.1,1000);if(await one('SELECT id FROM submissions WHERE assignment_id=? AND score>?',id,max))fail(409,'มีคะแนนที่ตรวจแล้วเกินคะแนนเต็มใหม่');const due=new Date(b.dueAt);if(!Number.isFinite(due.getTime()))fail(400,'วันกำหนดส่งไม่ถูกต้อง');await database().batch([stmt('UPDATE assignments SET title=?,description=?,max_score=?,due_at=? WHERE id=?',string(b.title,'ชื่องาน',150),typeof b.description==='string'?b.description.slice(0,10000):'',max,due.toISOString(),a.id),invalidateCourse(c.id)]);return reply({ok:true});
+ }
+ if(path==='samples'&&method==='POST'){
+  teacher(u);const form=await r.formData();const {a,c}=await assignmentAccess(u,String(form.get('assignmentId')));if(c.archived)fail(409,'รายวิชาเก็บเข้าประวัติแล้ว');const fs=await saveUploads(form,a,u,0,true);if(!fs.length)fail(400,'กรุณาแนบไฟล์');try{await database().batch(fs.map(insertFile));}catch(e){await Promise.all(fs.map(f=>bucket().delete(f.id)));throw e;}return reply({ok:true},201);
+ }
+ if(path==='submit'&&method==='POST'){
+  if(u.role!=='student')fail(403,'เฉพาะนักเรียนเท่านั้น');const form=await r.formData();const {a,c}=await assignmentAccess(u,String(form.get('assignmentId')));if(c.archived||c.published)fail(409,'รายวิชานี้ปิดรับงานแล้ว');
+  const old=await one('SELECT * FROM submissions WHERE assignment_id=? AND student_id=?',a.id,u.id);if(old&&old.status!=='returned')fail(409,'ส่งงานแล้ว ให้ครูส่งคืนก่อนแก้ไขงาน');
+  const revision=(old?.revision||0)+1;const fs=await saveUploads(form,a,u,revision);const note=String(form.get('note')||'').slice(0,3000);
+  try{const op=old?stmt("UPDATE submissions SET note=?,submitted_at=?,score=NULL,feedback='',status='pending',revision=?,reviewed_at=NULL WHERE id=? AND revision=? AND status='returned'",note,now(),revision,old.id,old.revision):stmt("INSERT INTO submissions (id,assignment_id,student_id,note,submitted_at,score,feedback,status,revision) VALUES (?,?,?,?,?,NULL,'','pending',?)",uid(),a.id,u.id,note,now(),revision);
+   const result=await database().batch([op,...fs.map(insertFile),invalidateCourse(c.id)]);if(result[0].meta.changes!==1){await database().batch(fs.map(f=>stmt('DELETE FROM files WHERE id=?',f.id)));fail(409,'งานเปลี่ยนระหว่างส่ง กรุณาโหลดใหม่');}
+  }catch(e){await Promise.all(fs.map(f=>bucket().delete(f.id)));throw e;}await log(u.id,c.id,'submission',{assignmentId:a.id,revision});return reply({ok:true},201);
+ }
+ if(path.startsWith('review/')&&method==='PATCH'){
+  teacher(u);const id=path.slice(7);const s=await one('SELECT * FROM submissions WHERE id=?',id);if(!s)fail(404,'ไม่พบงานที่ส่ง');const {a,c}=await assignmentAccess(u,s!.assignment_id);if(c.archived)fail(409,'รายวิชาเก็บเข้าประวัติแล้ว');const b=await jsonBody(r);const status=b.returned?'returned':'graded';const score=b.returned?null:number(b.score,'คะแนน',0,a.max_score);const rev=integer(b.revision,'รุ่นงาน',1,10000);const feedback=typeof b.feedback==='string'?b.feedback.slice(0,5000):'';
+  const result=await database().batch([stmt('UPDATE submissions SET score=?,feedback=?,status=?,reviewed_at=? WHERE id=? AND revision=?',score,feedback,status,now(),id,rev),invalidateCourse(c.id)]);if(!result[0].meta.changes)fail(409,'นักเรียนส่งงานรุ่นใหม่แล้ว กรุณาเปิดงานอีกครั้ง');await log(u.id,c.id,'review',{submissionId:id,score,status,revision:rev});return reply({ok:true});
+ }
+ if(path==='backup'&&method==='GET'){teacher(u);const state=await getState(u);const audit=await all('SELECT * FROM audit WHERE actor_id=? OR course_id IN (SELECT id FROM courses WHERE owner_id=?) ORDER BY created_at',u.id,u.id);return reply({version:1,exportedAt:now(),...state,audit});}
+ fail(404,'ไม่พบคำสั่ง');
+}
+async function route(r:Request){try{return await handle(r);}catch(e){if(e instanceof HttpError)return reply({error:e.message},e.status);console.error('Grade API error',e);return reply({error:'บันทึกหรือโหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่ ข้อมูลที่กรอกยังอยู่ในหน้าเดิม'},503);}}
+export const GET=route;export const POST=route;export const PATCH=route;
+
+
+
+

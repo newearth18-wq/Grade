@@ -1,0 +1,14 @@
+'use client';
+import type { ReactNode } from 'react';
+import { Inbox, LoaderCircle, Download } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
+export function Choice({value,onChange,options,label,disabled=false}:{value:string;onChange:(v:string)=>void;options:{value:string;label:string}[];label:string;disabled?:boolean}){return <NativeSelect aria-label={label} value={value} onChange={e=>onChange(e.target.value)} disabled={disabled}>{options.map(o=><NativeSelectOption key={o.value} value={o.value}>{o.label}</NativeSelectOption>)}</NativeSelect>;}
+export function Empty({title,description,action}:{title:string;description?:string;action?:ReactNode}){return <div className="empty-state"><span className="empty-icon"><Inbox/></span><h3>{title}</h3>{description&&<p className="muted">{description}</p>}{action}</div>;}
+export function Loading(){return <div className="loading"><LoaderCircle className="animate-spin"/> กำลังโหลดห้องเรียน…</div>;}
+export function DataTable({headers,rows}:{headers:string[];rows:ReactNode[][]}){return <div className="table-wrap"><Table><TableHeader><TableRow>{headers.map((h,i)=><TableHead key={i}>{h}</TableHead>)}</TableRow></TableHeader><TableBody>{rows.map((r,i)=><TableRow key={i}>{r.map((c,j)=><TableCell key={j}>{c}</TableCell>)}</TableRow>)}</TableBody></Table></div>;}
+export function Status({status}:{status:string}){const map:Record<string,[string,string]>={pending:['รอตรวจ','amber'],graded:['ตรวจแล้ว','green'],returned:['แก้ไขงาน','purple'],missing:['ยังไม่ส่ง','red'],late:['ส่งช้า','amber']};const [label,color]=map[status]||[status,'blue'];return <span className={`badge ${color}`}>{label}</span>;}
+export function FileLinks({files}:{files:any[]}){return <div className="file-links">{files.map(f=><a key={f.id} href={`/api/file/${f.id}`} target="_blank" rel="noreferrer"><Download size={15}/>{f.name}<span className="muted">{(f.size/1024).toFixed(0)} KB</span></a>)}</div>;}
+export function Images({files}:{files:any[]}){return <div className="work-images">{files.filter(f=>f.mime.startsWith('image/')).map(f=><a key={f.id} href={`/api/file/${f.id}`} target="_blank" rel="noreferrer"><img src={`/api/file/${f.id}`} alt={f.name} loading="lazy"/></a>)}</div>;}
+export function BusyButton({busy,children,...props}:any){return <Button disabled={busy||props.disabled} {...props}>{busy?<LoaderCircle className="animate-spin" size={16}/>:null}{children}</Button>;}
