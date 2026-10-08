@@ -1,5 +1,5 @@
 export type Row={id:string;[key:string]:any};
-export type AppState={user:Row;periods:Row[];courses:Row[];enrollments:Row[];assignments:Row[];submissions:Row[];files:Row[];students:Row[]};
+export type AppState={user:Row;periods:Row[];courses:Row[];enrollments:Row[];assignments:Row[];submissions:Row[];files:Row[];students:Row[];extensions:Row[];staff:Row[];people:Row[];profiles:Row[];history:Row[]};
 export type ImportRow={code:string;name:string;number:number};
 export async function api(path:string,body?:unknown,method='POST'):Promise<any>{
  const response=await fetch(`/api/${path}`,body===undefined?{credentials:'same-origin',cache:'no-store'}:body instanceof FormData?{method,body,credentials:'same-origin'}:{method,headers:{'Content-Type':'application/json'},body:JSON.stringify(body),credentials:'same-origin'});
