@@ -12,19 +12,17 @@ export function IslandScene({subjects,focusedId,onPick}:{subjects:IslandSubject[
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;if(pickTimer.current)clearTimeout(pickTimer.current);};},[]);
  useEffect(()=>{controls.current.paused=paused;},[paused]);
  useEffect(()=>{let disposed=false,cleanup=()=>{};setReady(false);setFallback(false);
-  async function start(){const T=await import('three');if(disposed||!canvasHost.current||!host.current)return;const mount=canvasHost.current,container=host.current;let renderer:InstanceType<typeof T.WebGLRenderer>;
+  async function start(){const [T,{createBanyanTree}]=await Promise.all([import('three'),import('@/lib/models/banyan-tree')]);if(disposed||!canvasHost.current||!host.current)return;const mount=canvasHost.current,container=host.current;let renderer:InstanceType<typeof T.WebGLRenderer>;
    try{renderer=new T.WebGLRenderer({alpha:true,antialias:true,powerPreference:'low-power'});}catch{setFallback(true);return;}
    renderer.setPixelRatio(Math.min(window.devicePixelRatio,1.5));renderer.setClearColor(0,0);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.35;renderer.domElement.setAttribute('aria-hidden','true');mount.appendChild(renderer.domElement);
    const scene=new T.Scene(),camera=new T.OrthographicCamera(-6,6,3.6,-3.6,.1,60);camera.position.set(0,2.2,12);camera.lookAt(0,.65,0);
    scene.add(new T.HemisphereLight(0xffdfef,0x71607d,2.3));const sun=new T.DirectionalLight(0xfff2d6,3.2);sun.position.set(-4,7,5);scene.add(sun);const fill=new T.DirectionalLight(0xc5cbff,1.8);fill.position.set(5,3,-4);scene.add(fill);
    const world=new T.Group();world.position.y=-.7;scene.add(world);let seed=73821;const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
-   const grass=new T.MeshStandardMaterial({color:0xbccf68,roughness:1,flatShading:true}),stone=new T.MeshStandardMaterial({color:0x715d87,roughness:1,flatShading:true}),bark=new T.MeshStandardMaterial({color:0x64827c,roughness:.9});
+   const grass=new T.MeshStandardMaterial({color:0xbccf68,roughness:1,flatShading:true}),stone=new T.MeshStandardMaterial({color:0x715d87,roughness:1,flatShading:true});
    function island(radius:number,x:number,y:number,z:number){const g=new T.Group(),rock=new T.Mesh(new T.IcosahedronGeometry(radius*.95,0),stone);rock.scale.set(1,.35,.9);rock.rotation.y=.3;rock.position.y=-.32;g.add(rock);const top=new T.Mesh(new T.CylinderGeometry(radius,radius*.93,.22,9),grass);top.position.y=.02;g.add(top);g.position.set(x,y,z);world.add(g);return g;}
-   const main=island(1.6,0,0,0);main.scale.z=.85;
-   const trunkPath=new T.CatmullRomCurve3([new T.Vector3(0,.1,0),new T.Vector3(-.35,.6,.05),new T.Vector3(.15,1.1,0),new T.Vector3(-.1,1.6,.05),new T.Vector3(.1,2,.05)]);main.add(new T.Mesh(new T.TubeGeometry(trunkPath,24,.115,8,false),bark));
-   for(let i=0;i<7;i++){const a=i*Math.PI*2/7;const branch=new T.CatmullRomCurve3([new T.Vector3(0,1.2,.03),new T.Vector3(Math.cos(a)*.5,1.7,Math.sin(a)*.4),new T.Vector3(Math.cos(a)*.9,2.05,Math.sin(a)*.8)]);main.add(new T.Mesh(new T.TubeGeometry(branch,10,.04,5,false),bark));}
-   const leafCount=window.innerWidth<700?700:1400,leafMaterial=new T.MeshStandardMaterial({color:0xffffff,roughness:.8,side:T.DoubleSide}),petals=new T.InstancedMesh(new T.IcosahedronGeometry(1,0),leafMaterial,leafCount),dummy=new T.Object3D(),color=new T.Color();
-   for(let i=0;i<leafCount;i++){const a=rand()*Math.PI*2,b=Math.acos(2*rand()-1),r=Math.cbrt(rand());dummy.position.set(Math.sin(b)*Math.cos(a)*1.55*r-.12,2.6+Math.cos(b)*1.25*r,Math.sin(b)*Math.sin(a)*1.12*r);const size=.035+rand()*.065;dummy.scale.set(size*1.9,size*.6,size);dummy.rotation.set(rand()*Math.PI,rand()*Math.PI,rand()*Math.PI);dummy.updateMatrix();petals.setMatrixAt(i,dummy.matrix);color.setHSL(.79+rand()*.13,.48+rand()*.23,.52+rand()*.23);petals.setColorAt(i,color);}petals.instanceMatrix.needsUpdate=true;main.add(petals);
+   const main=island(1.6,0,0,0);
+   main.add(createBanyanTree({detail:window.innerWidth<700?'compact':'full'}));
+   const dummy=new T.Object3D();
    const shards=[island(.55,-2.25,-.05,.45),island(.42,2.1,-.3,-.35),island(.27,-1.9,.35,-1.3),island(.22,1.8,.1,1.3)];
    const flowers=new T.InstancedMesh(new T.IcosahedronGeometry(.065,0),new T.MeshStandardMaterial({color:0xf4b7d1}),28);for(let i=0;i<28;i++){const a=rand()*Math.PI*2,r=.35+rand();dummy.position.set(Math.cos(a)*r,.18,Math.sin(a)*r*.7);dummy.scale.setScalar(.7+rand());dummy.rotation.set(rand(),rand(),rand());dummy.updateMatrix();flowers.setMatrixAt(i,dummy.matrix);}main.add(flowers);
    const bubbleGeometry=new T.SphereGeometry(1,32,20),bubbleMaterials=subjects.map((_,i)=>new T.MeshPhysicalMaterial({color:[0xf4b7dc,0xe2c5ff,0xffd7b4,0xc2e7f6][i%4],transparent:true,opacity:.3,roughness:.16,metalness:.03,clearcoat:1,clearcoatRoughness:.12,side:T.FrontSide,depthWrite:false}));
@@ -50,3 +48,4 @@ export function IslandScene({subjects,focusedId,onPick}:{subjects:IslandSubject[
   <div className="scene-controls"><button aria-label={paused?'เปิดการหมุนฉาก':'หยุดการหมุนฉาก'} aria-pressed={paused} onClick={()=>setPaused(v=>!v)}>{paused?<Play size={16}/>:<Pause size={16}/>}</button><button aria-label="กลับมุมเริ่มต้น" onClick={()=>{controls.current.angle=0;controls.current.px=0;controls.current.py=0;}}><RotateCcw size={16}/></button><span>{fallback?'เลือกฟองเพื่อเปิดวิชา':'ลากเพื่อหมุน · คลิกฟองเพื่อเปิดวิชา'}</span></div>
  </div>;
 }
+

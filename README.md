@@ -129,4 +129,18 @@ node tests/grades-and-export.mjs
 
 PDF.js (Apache-2.0), SheetJS (Apache-2.0), ExcelJS (MIT) และ Mammoth (BSD-2-Clause) ใช้ตาม license ของแต่ละโครงการ รูปแบบและระบบ build เริ่มจาก Vinext/Sites starter
 
+## โมเดลต้นไทร 3D
+
+ฉากรายวิชาใช้ต้นไทรต้นฉบับแบบ low-poly มีลำต้น รากค้ำยัน รากอากาศ และพุ่มสีเขียว หน้า `/banyan` ใช้ลากหมุน ซูม หยุดหมุน และดาวน์โหลดไฟล์ GLB ได้ รองรับมือถือและการลดการเคลื่อนไหวของระบบ
+
+แก้รูปทรงใน `lib/models/banyan-tree.ts` ฉากเว็บรวมเนื้อไม้ตามวัสดุเป็นสองชุดและใช้ใบแบบ instancing จึงวาดต้นไม้เพียงสามชุด บนมือถือใช้ใบ 1,800 ชิ้นแทน 3,600 ชิ้น ไฟล์ส่งออกคงชิ้นส่วนชื่อแยกและแปลงใบเป็น mesh ธรรมดาพร้อมสี ไม่ต้องพึ่ง extension สำหรับ instancing
+
+ใช้ Node 24 ขึ้นไปส่งออกไฟล์พร้อมตรวจตำแหน่ง ขนาด และนำไฟล์กลับมาเปิดด้วย GLTFLoader:
+
+```sh
+node scripts/export-banyan.mjs
+```
+
+ได้ไฟล์ `public/models/grade-banyan.glb` เพิ่ม path ปลายทางเป็น argument เพื่อคัดลอกโมเดลไปส่งมอบได้ด้วย
+
 
