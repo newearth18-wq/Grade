@@ -2,6 +2,7 @@
 import './enhancements.css';
 import './bubble-world.css';
 import './immersive-world.css';
+import './island-world.css';
 import { useEffect, useRef, useState } from 'react';
 import { GraduationCap,LayoutDashboard,ClipboardCheck,Users,BarChart3,FileSpreadsheet,BookOpen,CalendarDays,ShieldCheck,Plus,RefreshCw,LogOut,KeyRound,Download,Archive,Undo2 } from 'lucide-react';
 import {Menu} from 'lucide-react';
