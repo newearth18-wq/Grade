@@ -13,3 +13,5 @@ Never run integration tests against production or a real school database. The su
 
 - `node tests/subject-migration.mjs` applies the multi-room migration to legacy fixtures and verifies the section IDs, enrollments, score and submission revision remain intact.
 - `built-worker.mjs` also runs `subjects.mjs`: atomic multi-room creation, shared subject metadata, distributed assignments/sample bytes, student/teacher room privacy, term isolation and preserved grouping after restore.
+
+- built-worker.mjs รวม tests/exams.mjs: สิทธิ์/เฉลย, ล็อกและปลดล็อก, รีโหลด, ตรวจและโอนคะแนน, ข้อเขียน, ถังขยะ, สำรองกู้คืน, หมดเวลาและ heartbeat รวม 8 กลุ่มบนฐานข้อมูลจำลองเท่านั้น

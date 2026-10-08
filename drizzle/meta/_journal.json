@@ -50,6 +50,20 @@
       "when": 1791466565369,
       "tag": "0006_absent_swordsman",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1791468316957,
+      "tag": "0007_mighty_kree",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791468864665,
+      "tag": "0008_gigantic_electro",
+      "breakpoints": true
     }
   ]
 }

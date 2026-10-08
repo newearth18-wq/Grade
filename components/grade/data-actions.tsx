@@ -4,7 +4,7 @@ import {Trash2} from 'lucide-react';
 import {Button} from '@/components/ui/button';
 import {Dialog,DialogContent,DialogHeader,DialogTitle,DialogDescription} from '@/components/ui/dialog';
 import {api} from '@/lib/client';
-export const dataLabels:Record<string,string>={period:'ภาคเรียน',subject:'วิชา',course:'ห้องเรียน',assignment:'งานที่มอบหมาย',enrollment:'การลงทะเบียน',submission:'งานส่ง / คะแนนงาน',file:'ไฟล์',student:'บัญชีนักเรียน',extension:'กำหนดส่งรายคน',profile:'แบบส่งออก SGS'};
+export const dataLabels:Record<string,string>={exam:'ข้อสอบ',examAttempt:'คำตอบสอบ',period:'ภาคเรียน',subject:'วิชา',course:'ห้องเรียน',assignment:'งานที่มอบหมาย',enrollment:'การลงทะเบียน',submission:'งานส่ง / คะแนนงาน',file:'ไฟล์',student:'บัญชีนักเรียน',extension:'กำหนดส่งรายคน',profile:'แบบส่งออก SGS'};
 const RefreshContext=createContext<()=>Promise<any>>(async()=>{});
 export function DataActionsProvider({refresh,children}:{refresh:()=>Promise<any>;children:ReactNode}){return <RefreshContext.Provider value={refresh}>{children}</RefreshContext.Provider>;}
 export function DeleteButton({kind,id,label='ลบ',disabled=false}:{kind:string;id:string;label?:string;disabled?:boolean}){

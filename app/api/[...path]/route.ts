@@ -3,6 +3,7 @@ import { currentUser, requireUser, teacher, ownCourse, hashPassword, matches, pa
 import {createSections,subjectRoute} from '@/lib/subjects-server';
 import { getState } from '@/lib/state';
 import {trashRoute} from '@/lib/trash-server';
+import {examRoute} from '@/lib/exam-server';
 import { extendedRoute } from '@/lib/extended-server';
 import { parseRubric,validateRubric,rubricScore } from '@/lib/rubrics';
 import { calculateGrade } from '@/lib/grades';
@@ -60,6 +61,7 @@ async function handle(r:Request){
   const hash=await hashPassword(passwordValid(b.password));await database().batch([stmt('UPDATE users SET password=?,must_change=0 WHERE id=?',hash,u.id),stmt('DELETE FROM sessions WHERE user_id=?',u.id)]);return reply({ok:true},200,{'Set-Cookie':await session(r,u.id)});
  }
  if(u.must_change)fail(403,'กรุณาเปลี่ยนรหัสผ่านชั่วคราวก่อนใช้งาน');
+ const examResponse=await examRoute(r,u,path,method);if(examResponse)return examResponse;
  const trashResponse=await trashRoute(r,u,path,method);if(trashResponse)return trashResponse;
  const subjectResponse=await subjectRoute(r,u,path,method);if(subjectResponse)return subjectResponse;
  const extra=await extendedRoute(r,u,path,method);if(extra)return extra;

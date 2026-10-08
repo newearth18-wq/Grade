@@ -1,9 +1,9 @@
 import {all,one,stmt,database,fail,uid,now,jsonBody,reply,string,integer,requireLive} from './server';
 import {teacher,ownCourse,digest,type User} from './auth';
 
-const tables:Record<string,string>={period:'periods',subject:'subjects',course:'courses',assignment:'assignments',enrollment:'enrollments',submission:'submissions',file:'files',student:'users',extension:'extensions',profile:'sgs_profiles'};
-const reusable=['period','subject','course','enrollment','submission','extension'];
-export const trashLabels:Record<string,string>={period:'ภาคเรียน',subject:'วิชา',course:'ห้องเรียน',assignment:'งานที่มอบหมาย',enrollment:'การลงทะเบียน',submission:'งานส่ง / คะแนนงาน',file:'ไฟล์',student:'บัญชีนักเรียน',extension:'กำหนดส่งรายคน',profile:'แบบส่งออก SGS'};
+const tables:Record<string,string>={exam:'exams',examAttempt:'exam_attempts',period:'periods',subject:'subjects',course:'courses',assignment:'assignments',enrollment:'enrollments',submission:'submissions',file:'files',student:'users',extension:'extensions',profile:'sgs_profiles'};
+const reusable=['exam','period','subject','course','enrollment','submission','extension'];
+export const trashLabels:Record<string,string>={exam:'ข้อสอบ',examAttempt:'คำตอบสอบ',period:'ภาคเรียน',subject:'วิชา',course:'ห้องเรียน',assignment:'งานที่มอบหมาย',enrollment:'การลงทะเบียน',submission:'งานส่ง / คะแนนงาน',file:'ไฟล์',student:'บัญชีนักเรียน',extension:'กำหนดส่งรายคน',profile:'แบบส่งออก SGS'};
 type Item={kind:string;id:string;row:Record<string,any>};
 async function checkCourses(u:User,courses:Record<string,any>[]){
  if(u.role==='admin')return;
@@ -26,9 +26,10 @@ async function plan(u:User,kind:string,id:string){
  else if(kind==='period')cs=await all('SELECT * FROM courses WHERE period_id=?',id);
  else if(kind==='subject')cs=await all('SELECT * FROM courses WHERE subject_id=?',id);
  else if(kind==='course')cs=[target!];
- else if(kind==='assignment'||kind==='enrollment'||kind==='file')cs=[await one('SELECT * FROM courses WHERE id=?',target!.course_id) as Record<string,any>];
+ else if(kind==='exam'||kind==='assignment'||kind==='enrollment'||kind==='file')cs=[await one('SELECT * FROM courses WHERE id=?',target!.course_id) as Record<string,any>];
  else if(kind==='submission'||kind==='extension')cs=await all('SELECT c.* FROM courses c JOIN assignments a ON a.course_id=c.id WHERE a.id=?',target!.assignment_id);
  else if(kind==='student')cs=await all('SELECT DISTINCT c.* FROM courses c JOIN enrollments e ON e.course_id=c.id WHERE e.student_id=?',id);
+ if(kind==='examAttempt')cs=await all('SELECT c.* FROM courses c JOIN exams e ON e.course_id=c.id WHERE e.id=?',target!.exam_id);
  // Restoration and deletion both check actual permissions, including hidden descendants.
  await checkCourses(u,cs);
  if(target)add(kind,target);
@@ -43,6 +44,9 @@ async function plan(u:User,kind:string,id:string){
  }
  if(cs.length){
   const courseIds=JSON.stringify(cs.map(c=>c.id));
+  const examRows=await all('SELECT * FROM exams WHERE course_id IN(SELECT value FROM json_each(?))',courseIds);
+  if(full||kind==='exam')for(const e of examRows)if(full||e.id===id)add('exam',e);
+  if(full||['exam','examAttempt','student','enrollment'].includes(kind)){const studentId=kind==='student'?id:kind==='enrollment'?target!.student_id:null;for(const a of await all('SELECT a.* FROM exam_attempts a JOIN exams e ON e.id=a.exam_id WHERE e.course_id IN(SELECT value FROM json_each(?))',courseIds))if((full||kind==='exam'&&a.exam_id===id||kind==='examAttempt'&&a.id===id||studentId&&a.student_id===studentId))add('examAttempt',a);}
   const tasks=await all('SELECT * FROM assignments WHERE course_id IN(SELECT value FROM json_each(?))',courseIds);
   if(full)for(const a of tasks)add('assignment',a);
   if(full||kind==='student')for(const e of await all('SELECT * FROM enrollments WHERE course_id IN(SELECT value FROM json_each(?))'+(kind==='student'?' AND student_id=?':''),courseIds,...(kind==='student'?[id]:[])))add('enrollment',e);
@@ -75,9 +79,10 @@ async function restore(u:User,id:string){
  for(const e of entries){const row=rows.get(`${e.kind}:${e.record_id}`);if(!row)fail(409,'ข้อมูลต้นฉบับไม่ครบ กรุณาตรวจสอบชุดสำรอง');
   if(e.kind==='subject')await check('period',row!.period_id);
   if(e.kind==='course'){await check('period',row!.period_id);await check('subject',row!.subject_id);affected.add(row!.id);}
-  if(['assignment','enrollment','file'].includes(e.kind)){await check('course',row!.course_id);affected.add(row!.course_id);}
+  if(['exam','assignment','enrollment','file'].includes(e.kind)){await check('course',row!.course_id);affected.add(row!.course_id);}
   if(['submission','extension','file'].includes(e.kind))await check('assignment',row!.assignment_id);
-  if(['enrollment','submission','extension','file'].includes(e.kind))await check('student',row!.student_id);
+  if(['examAttempt','enrollment','submission','extension','file'].includes(e.kind))await check('student',row!.student_id);
+  if(e.kind==='examAttempt'){check('exam',row!.exam_id);check('enrollment',row!.enrollment_id);const parent=await one('SELECT course_id FROM exams WHERE id=?',row!.exam_id);if(parent)affected.add(parent.course_id);}
   if(e.kind==='submission'||e.kind==='extension'){const a=parentTasks.get(row!.assignment_id);if(a)affected.add(a.course_id);}
   if(['period','subject','profile'].includes(e.kind)&&row!.owner_id!==u.id&&u.role!=='admin')fail(403,'ไม่มีสิทธิ์กู้คืนข้อมูลนี้');
  }
