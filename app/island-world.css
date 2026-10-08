@@ -12,3 +12,16 @@
 .island-stage{max-height:580px;min-height:320px;height:calc(100dvh - 390px)}
 @media(max-width:800px){.island-stage{min-height:345px;height:calc(100dvh - 445px)}.scene-fallback .orbit-subjects{display:flex}}
 .scene-fallback .orbit-subjects{display:flex}
+
+/* A larger living canopy anchors the scene, while the score stays readable below. */
+.island-stage{min-height:400px;height:calc(100dvh - 420px);max-height:680px;margin-top:12px}
+.island-explorer .world-heading{align-items:center;padding-inline:8px}.island-focused-label{margin-top:8px;margin-bottom:8px}
+.orbit-bubble{backdrop-filter:blur(2px);transition:box-shadow .2s,opacity .3s,border-color .2s}.orbit-bubble[aria-pressed=true]{border:2px solid #fff7e8;box-shadow:inset 7px 9px 18px #ffffff9c,0 0 0 4px #fff4,0 15px 30px #7c398533}
+.tree-growth-summary{display:grid;grid-template-columns:1fr auto;gap:.4rem 1.5rem;width:min(100%,640px);margin:.6rem auto 1rem;padding:.9rem 1.2rem;background:#fff9;border:1px solid #fff9;border-radius:22px;color:#43265c;box-shadow:0 10px 30px #6237740a}
+.tree-growth-summary>div:first-child{display:grid;gap:.2rem}.tree-growth-kicker{font-size:.875rem;color:#62417b}.tree-growth-summary strong{font-size:1rem}.tree-growth-score{text-align:right;display:grid;gap:.2rem}.tree-growth-score>strong{font-size:1.25rem}.tree-growth-score small,.tree-growth-score>span{font-size:.875rem;font-weight:400;color:#62417b}
+.tree-growth-meter{grid-column:1/-1;height:8px;overflow:hidden;border-radius:99px;background:#dbcce8;margin-top:.35rem}.tree-growth-meter i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#7956bf,#bd4692);transition:width .8s ease}
+.tree-growth-summary>p{grid-column:1/-1;font-size:.875rem;line-height:1.65;color:#62417b;margin-top:.2rem}.tree-growth-summary>p>span{display:block}
+.island-explorer .world-room-row{flex-wrap:wrap}.scene-controls{bottom:0;background:#fff9;border:1px solid #fff8;border-radius:99px;padding:5px 8px;max-width:calc(100% - 16px)}.scene-controls button{background:white;border-color:#ebd9ed;flex-shrink:0}
+@media(max-width:800px){.island-stage{min-height:380px;height:calc(100dvh - 440px);max-height:550px;margin-top:18px}.tree-growth-summary{padding:.8rem 1rem;gap:.5rem}.tree-growth-score>strong{font-size:1.1rem}.tree-growth-score>span{max-width:150px}.island-explorer .world-heading h2{max-width:calc(100% - 100px);margin-right:100px}.scene-controls span{font-size:.875rem}.island-focused-label h3{padding-inline:12px}.island-explorer .world-quick-actions{flex-wrap:wrap}}
+@media(max-width:420px){.tree-growth-summary{grid-template-columns:1fr}.tree-growth-score{text-align:left;display:flex;align-items:center;flex-wrap:wrap;gap:.5rem}.tree-growth-score>span{max-width:none}.scene-controls span{max-width:180px}.island-stage{min-height:370px}}
+@media(prefers-reduced-motion:reduce){.tree-growth-meter i{transition:none}}

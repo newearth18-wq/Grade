@@ -2,7 +2,7 @@ import * as T from 'three';
 import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 
 /** Original procedural banyan. Y is up; dimensions are metres, origin at ground. */
-export function createBanyanTree({detail='full',seed=1987,optimize=true}:{detail?:'full'|'compact';seed?:number;optimize?:boolean}={}) {
+export function createBanyanTree({detail='full',seed=1987,optimize=true,palette='jade'}:{detail?:'full'|'compact';seed?:number;optimize?:boolean;palette?:'jade'|'blossom'}={}) {
   const tree=new T.Group();tree.name='Grade Banyan';tree.userData={species:'Ficus benghalensis',artist:'Grade',units:'metres',seed};
   let state=seed;const random=()=>{state=(state*1664525+1013904223)>>>0;return state/4294967296;};
   const bark=new T.MeshStandardMaterial({name:'Warm grey bark',color:0x817361,roughness:1});
@@ -51,11 +51,11 @@ export function createBanyanTree({detail='full',seed=1987,optimize=true}:{detail
   foliage.name='Evergreen canopy';
   for(let i=0;i<count;i++){
     const c=crowns[i%crowns.length],a=random()*Math.PI*2,b=Math.acos(2*random()-1),r=Math.cbrt(random()),size=.08+random()*.095;
-    dummy.position.set(c.x+Math.sin(b)*Math.cos(a)*r*c.radius,c.y+Math.cos(b)*r*c.radius*.47,c.z+Math.sin(b)*Math.sin(a)*r*c.radius*.78);
+    dummy.position.set(c.x+Math.sin(b)*Math.cos(a)*r*c.radius,c.y+Math.cos(b)*r*c.radius*(palette==='blossom'?.68:.47),c.z+Math.sin(b)*Math.sin(a)*r*c.radius*.78);
     dummy.scale.set(size*1.45,size*.40,size);dummy.rotation.set((random()-.5)*1.8,random()*Math.PI*2,(random()-.5)*1.3);dummy.updateMatrix();foliage.setMatrixAt(i,dummy.matrix);
-    const sun=(dummy.position.y-2.1)/1.15;color.setHSL(.23+random()*.08,.34+random()*.22,.20+Math.max(0,sun)*.15+random()*.12);foliage.setColorAt(i,color);
+    const sun=(dummy.position.y-2.1)/1.15;const variation=random();color.setHSL(palette==='blossom'?.86+variation*.08:.23+variation*.08,palette==='blossom'?.55+random()*.2:.34+random()*.22,palette==='blossom'?.32+Math.max(0,sun)*.1+random()*.08:.20+Math.max(0,sun)*.15+random()*.12);foliage.setColorAt(i,color);
   }
-  foliage.instanceMatrix.needsUpdate=true;foliage.computeBoundingSphere();tree.add(foliage);
+  foliage.userData.fullCount=count;foliage.instanceMatrix.needsUpdate=true;foliage.computeBoundingSphere();tree.add(foliage);
   // Batch static wood by material: the web scene needs only three tree draw calls.
   // Exporting with optimize:false retains individually named, editable parts.
   if(optimize){
