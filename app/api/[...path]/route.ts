@@ -1,5 +1,5 @@
 import { all, one, stmt, database, bucket, HttpError, fail, uid, now, string, number, integer, jsonBody, reply, ensureSameOrigin, log } from '@/lib/server';
-import { currentUser, requireUser, teacher, ownCourse, hashPassword, matches, passwordValid, session, cookie, digest, type User } from '@/lib/auth';
+import { currentUser, requireUser, teacher, ownCourse, hashPassword, matches, passwordValid, session, cookie, digest, upgradeStudentInitialPassword, type User } from '@/lib/auth';
 import {createSections,subjectRoute} from '@/lib/subjects-server';
 import { getState } from '@/lib/state';
 import { extendedRoute } from '@/lib/extended-server';
@@ -45,7 +45,8 @@ async function handle(r:Request){
   const key=await digest((r.headers.get('cf-connecting-ip')||'local')+':'+username.toLowerCase());
   await stmt('INSERT INTO login_limits (key,count,expires) VALUES (?,1,?) ON CONFLICT(key) DO UPDATE SET count=CASE WHEN expires<? THEN 1 ELSE count+1 END, expires=CASE WHEN expires<? THEN excluded.expires ELSE expires END',key,Date.now()+900000,Date.now(),Date.now()).run();
   const limit=await one('SELECT count FROM login_limits WHERE key=?',key);if(limit!.count>10)fail(429,'ลองเข้าสู่ระบบหลายครั้ง กรุณารอ 15 นาที');
-  const user=await one('SELECT * FROM users WHERE username=? AND active=1',username);
+  let user=await one('SELECT * FROM users WHERE username=? AND active=1',username);
+  if(user?.role==='student'&&user.must_change){await upgradeStudentInitialPassword(user as User);user=await one('SELECT * FROM users WHERE username=? AND active=1',username);}
   const valid=await matches(p,user?.password||'00000000000000000000000000000000:0000000000000000000000000000000000000000000000000000000000000000');if(!valid||!user)fail(401,'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
   await stmt('DELETE FROM login_limits WHERE key=?',key).run();return reply({ok:true},200,{'Set-Cookie':await session(r,user!.id)});
  }
@@ -79,14 +80,14 @@ async function handle(r:Request){
   teacher(u);const b=await jsonBody(r);await openCourse(u,string(b.courseId,'รายวิชา'));const code=string(b.code,'รหัสนักเรียน',40);if(!/^[a-zA-Z0-9_.-]{1,40}$/.test(code))fail(400,'รหัสนักเรียนต้องเป็นตัวเลขหรือตัวอักษรอังกฤษ');const name=string(b.name,'ชื่อนักเรียน',100);const n=integer(b.number,'เลขที่',1,999);
   let student=await one('SELECT * FROM users WHERE username=?',code);if(student&&student.role!=='student')fail(409,'รหัสนี้เป็นบัญชีครู');
   const ops=[];let initialPassword:string|null=null;
-  if(!student){const id=uid();initialPassword=typeof b.password==='string'&&b.password?passwordValid(b.password):`Gr-${uid().slice(0,12)}`;ops.push(stmt('INSERT INTO users (id,username,name,role,password,active,must_change,created_at) VALUES (?,?,?,?,?,1,1,?)',id,code,name,'student',await hashPassword(initialPassword),now()));student={id};}
+  if(!student){const id=uid();initialPassword=code;ops.push(stmt('INSERT INTO users (id,username,name,role,password,active,must_change,created_at) VALUES (?,?,?,?,?,1,0,?)',id,code,name,'student',await hashPassword(initialPassword),now()));student={id};}
   ops.push(stmt('INSERT INTO enrollments (id,course_id,student_id,student_code,name,number,active,special) VALUES (?,?,?,?,?,?,1,?)',uid(),b.courseId,student.id,code,name,n,''));
   try{await database().batch([...ops,invalidateCourse(b.courseId)]);}catch{fail(409,'นักเรียนคนนี้ลงทะเบียนรายวิชานี้แล้ว');}
   return reply({ok:true,code,initialPassword},201);
  }
  if(path.startsWith('enrollments/')&&method==='PATCH'){
   teacher(u);const id=path.slice(12);const e=await one('SELECT * FROM enrollments WHERE id=?',id);if(!e)fail(404,'ไม่พบนักเรียน');const c=await openCourse(u,e!.course_id);const b=await jsonBody(r);
-  if(b.resetPassword){if(u.role!=='admin')fail(403,'เฉพาะผู้ดูแลระบบตั้งรหัสผ่านนักเรียนได้');const password=passwordValid(b.password);await database().batch([stmt('UPDATE users SET password=?,must_change=1 WHERE id=?',await hashPassword(password),e!.student_id),stmt('DELETE FROM sessions WHERE user_id=?',e!.student_id)]);await log(u.id,c.id,'reset_password',{studentId:e!.student_id});return reply({ok:true});}
+  if(b.resetPassword){if(u.role!=='admin')fail(403,'เฉพาะผู้ดูแลระบบตั้งรหัสผ่านนักเรียนได้');const account=await one('SELECT username FROM users WHERE id=?',e!.student_id);if(!account)fail(404,'ไม่พบบัญชีนักเรียน');const password=account!.username;await database().batch([stmt('UPDATE users SET password=?,must_change=0 WHERE id=?',await hashPassword(password),e!.student_id),stmt('DELETE FROM sessions WHERE user_id=?',e!.student_id)]);await log(u.id,c.id,'reset_password',{studentId:e!.student_id});return reply({ok:true,code:password,initialPassword:password});}
   if('mid' in b||'final' in b||'special' in b){const mid='mid' in b?(b.mid===null?null:number(b.mid,'กลางภาค',0,c.mid_weight)):e!.mid;const final='final' in b?(b.final===null?null:number(b.final,'ปลายภาค',0,c.final_weight)):e!.final;const special='special' in b?(typeof b.special==='string'?b.special:''):e!.special;if(!['','ร','มส'].includes(special))fail(400,'สถานะผลการเรียนไม่ถูกต้อง');const columns:string[]=[];const values:unknown[]=[];if('mid' in b){columns.push('mid=?');values.push(mid);}if('final' in b){columns.push('final=?');values.push(final);}if('special' in b){columns.push('special=?');values.push(special);}await database().batch([stmt('UPDATE enrollments SET '+columns.join(',')+' WHERE id=?',...values,id),invalidateCourse(c.id)]);await log(u.id,c.id,'exam_scores',{enrollment:id,before:{mid:e!.mid,final:e!.final,special:e!.special},mid,final,special});}
   else{await database().batch([stmt('UPDATE enrollments SET name=?,number=?,active=? WHERE id=?',string(b.name,'ชื่อนักเรียน',100),integer(b.number,'เลขที่',1,999),b.active===false?0:1,id),invalidateCourse(c.id)]);}
   return reply({ok:true});
@@ -99,7 +100,7 @@ async function handle(r:Request){
   const seen=new Set<string>();const rows=b.rows.map((row:any)=>{const code=string(row.code,'รหัสนักเรียน',40);if(!/^[a-zA-Z0-9_.-]{1,40}$/.test(code)||seen.has(code))fail(400,`รหัส ${code} ไม่ถูกต้องหรือซ้ำในไฟล์`);seen.add(code);return {code,name:string(row.name,'ชื่อ',100),number:integer(row.number,'เลขที่',1,999)};});
   const credentials=[];const ops=[];const existingUsers=new Map((await all('SELECT id,username,role FROM users')).map(s=>[s.username,s]));const registered=new Set((await all('SELECT student_code FROM enrollments WHERE course_id=?',b.courseId)).map(e=>e.student_code));
   for(const row of rows){let s=existingUsers.get(row.code);if(s&&s.role!=='student')fail(409,`รหัส ${row.code} เป็นบัญชีครู`);if(registered.has(row.code))fail(409,`รหัส ${row.code} มีในรายวิชานี้แล้ว กรุณาแก้ไขรายชื่อหรือตัดแถวนี้ออก`);
-   if(!s){const id=uid(),p=`Gr-${uid().slice(0,12)}`;s={id};ops.push(stmt('INSERT INTO users (id,username,name,role,password,active,must_change,created_at) VALUES (?,?,?,?,?,1,1,?)',id,row.code,row.name,'student',await hashPassword(p),now()));credentials.push({code:row.code,name:row.name,password:p});}
+   if(!s){const id=uid(),p=row.code;s={id};ops.push(stmt('INSERT INTO users (id,username,name,role,password,active,must_change,created_at) VALUES (?,?,?,?,?,1,0,?)',id,row.code,row.name,'student',await hashPassword(p),now()));credentials.push({code:row.code,name:row.name,password:p});}
    ops.push(stmt('INSERT INTO enrollments (id,course_id,student_id,student_code,name,number,active,special) VALUES (?,?,?,?,?,?,1,?)',uid(),b.courseId,s!.id,row.code,row.name,row.number,''));
   }
   try{await database().batch([...ops,invalidateCourse(b.courseId)]);}catch{fail(409,'มีข้อมูลซ้ำหรือเปลี่ยนระหว่างนำเข้า กรุณาตรวจสอบแล้วลองใหม่');}
