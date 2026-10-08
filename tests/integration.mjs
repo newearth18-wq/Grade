@@ -3,7 +3,7 @@ import { mkdir,writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 const base=process.env.GRADE_TEST_URL||'http://127.0.0.1:5173';
 const results=[];const outputDir=process.env.GRADE_TEST_OUTPUT||'.sites-runtime';
-function client(){let cookie='';return async(path,body,method='POST',expected=200,extra={})=>{const r=await fetch(`${base}/api/${path}`,{method:body===undefined?'GET':method,headers:{...(body instanceof FormData?{}:body===undefined?{}:{'Content-Type':'application/json'}),...(cookie?{Cookie:cookie}:{}),...extra},body:body===undefined?undefined:body instanceof FormData?body:JSON.stringify(body)});const next=r.headers.get('set-cookie');if(next)cookie=next.split(';')[0];const raw=await r.text();let data;try{data=JSON.parse(raw);}catch{data=raw.slice(0,2000);}assert.equal(r.status,expected,`${path}: ${JSON.stringify(data)}`);return data;};}
+function client(){let cookie='';return async(path,body,method='POST',expected=200,extra={})=>{const r=await fetch(`${base}/api/${path}`,{method:body===undefined?'GET':method,headers:{Connection:'close',...(body instanceof FormData?{}:body===undefined?{}:{'Content-Type':'application/json'}),...(cookie?{Cookie:cookie}:{}),...extra},body:body===undefined?undefined:body instanceof FormData?body:JSON.stringify(body)});const next=r.headers.get('set-cookie');if(next)cookie=next.split(';')[0];const raw=await r.text();let data;try{data=JSON.parse(raw);}catch{data=raw.slice(0,2000);}assert.equal(r.status,expected,`${path}: ${JSON.stringify(data)}`);return data;};}
 const t=client(),a=client(),b=client();const initial=await t('auth');assert.equal(initial.setup,true,'Tests require an empty, disposable local database. Do not run against real school records.');
 const teacherPassword=`Test-${randomUUID()}`,studentPassword=`Student-${randomUUID()}`;
 const check=(name)=>{results.push(name);console.log(`PASS ${name}`);};
@@ -23,6 +23,7 @@ await t(`courses/${c1.id}`,{published:true},'PATCH',409);s=await t('state');cons
 const oldName=(await t('state')).enrollments.find(e=>e.id===e1.id).name;const eNew=(await t('state')).enrollments.find(e=>e.course_id===c2.id);await t(`enrollments/${eNew.id}`,{name:'ชื่อใหม่ เฉพาะเทอมสอง',number:7,active:true},'PATCH');assert.equal((await t('state')).enrollments.find(e=>e.id===e1.id).name,oldName);await t(`courses/${c1.id}`,{archived:true},'PATCH');await t(`review/${sub.id}`,{score:9,revision:2},'PATCH',409);await t(`courses/${c1.id}`,{archived:false},'PATCH');check('Historical roster snapshots and reversible course archive');
 const backup=await t('backup');assert.equal(backup.user.password,undefined);assert(backup.audit.length>0);assert(!JSON.stringify(backup).includes('password":"'));check('Backup without password hashes, audit history');
 await mkdir(outputDir,{recursive:true});await writeFile(outputDir+'/test-login.json',JSON.stringify({username:'teacher-e2e',password:teacherPassword,studentUsername:'00001',studentPassword}));await writeFile(outputDir+'/test-report.json',JSON.stringify({passed:results.length,checks:results},null,2));console.log(`${results.length} integration groups passed.`);
+
 
 
 
