@@ -32,4 +32,5 @@ html{scroll-behavior:smooth}body{background:#d1ace6}
 .immersive-explorer .orb-stage{min-height:290px}.immersive-explorer .focused-orb{width:clamp(185px,30dvh,280px)}
 .immersive-explorer .focused-subject{inset:0 23%;justify-content:center}
 .immersive-explorer .world-pagination{margin-bottom:10px}.immersive-explorer .world-quick-actions{margin-top:10px;min-height:32px}.immersive-explorer .explore-more{margin-top:6px;padding:5px 14px}
+.auth-shell .page-heading{align-items:center}.auth-shell .page-heading .eyebrow{font-size:clamp(5rem,18dvh,10rem)}.auth-shell .setup-form{gap:14px}.auth-shell .setup-form label,.auth-shell .setup-form .section-title{margin-bottom:0}
 @media(max-width:800px){.immersive-explorer .focused-subject{inset:10px 17% 0}.immersive-explorer .focused-orb{width:clamp(160px,42vw,220px)}.immersive-explorer .orb-stage{min-height:290px}.immersive-explorer .world-heading{justify-content:flex-start;text-align:left}.immersive-explorer .world-heading>div:first-child{justify-items:start}.immersive-explorer .world-status{max-width:330px}}
