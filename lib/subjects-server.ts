@@ -14,13 +14,14 @@ export async function createSections(u:User,b:any){
  const classrooms=rooms.map((s:any)=>string(s,'ห้องเรียน',40));if(new Set(classrooms).size!==classrooms.length)fail(400,'ห้องเรียนซ้ำ');
  let body=b;if(b.subjectId){const parent=await one('SELECT * FROM subjects WHERE id=?',b.subjectId);if(!parent||(u.role!=='admin'&&parent.owner_id!==u.id))fail(403,'เฉพาะเจ้าของวิชาหรือผู้ดูแลเพิ่มห้องได้');
   const source=await one('SELECT * FROM courses WHERE subject_id=? ORDER BY rowid LIMIT 1',parent.id);if(!source)fail(404,'ไม่พบห้องต้นแบบ');
-  body={...b,periodId:parent.period_id,code:parent.code,name:parent.name,workWeight:source.work_weight,midWeight:source.mid_weight,finalWeight:source.final_weight};
+  body={...b,periodId:parent.period_id,code:parent.code,name:parent.name,workWeight:source.work_weight,midWeight:source.mid_weight,finalWeight:source.final_weight,beforeWorkWeight:source.before_work_weight??source.work_weight/2};
   // Keep the original subject owner when the school administrator adds a section.
   u={...u,id:parent.owner_id};
  }
  const w=number(body.workWeight,'คะแนนเก็บ'),m=number(body.midWeight,'กลางภาค'),f=number(body.finalWeight,'ปลายภาค');if(Math.abs(w+m+f-100)>.0001)fail(400,'สัดส่วนคะแนนต้องรวมเป็น 100');
+ const before=number(body.beforeWorkWeight??w/2,'คะแนนเก็บก่อนกลางภาค',0,w);
  const parent=await subjectPlan(u,body),ids=classrooms.map(()=>uid());
- const ops=[...parent.ops,...classrooms.map((classroom:string,i:number)=>stmt('INSERT INTO courses (id,subject_id,period_id,owner_id,code,name,classroom,work_weight,mid_weight,final_weight,published,archived) VALUES (?,?,?,?,?,?,?,?,?,?,0,0)',ids[i],parent.id,parent.periodId,u.id,parent.code,parent.name,classroom,w,m,f))];
+ const ops=[...parent.ops,...classrooms.map((classroom:string,i:number)=>stmt('INSERT INTO courses (id,subject_id,period_id,owner_id,code,name,classroom,work_weight,mid_weight,final_weight,before_work_weight,grading_mode,published,archived) VALUES (?,?,?,?,?,?,?,?,?,?,?,\'points\',0,0)',ids[i],parent.id,parent.periodId,u.id,parent.code,parent.name,classroom,w,m,f,before))];
  try{await database().batch(ops);}catch{fail(409,'มีห้องเรียนนี้ในรายวิชา/ภาคเรียนแล้ว ไม่มีห้องถูกเพิ่มบางส่วน');}
  return {id:ids[0],ids,subjectId:parent.id,periodId:parent.periodId};
 }

@@ -4,6 +4,7 @@ export function scopeFor(u:User){return u.role==='admin'?{sql:'1=1',args:[] as u
 export async function getState(u:User){
  const {sql:scope,args}=scopeFor(u),student=u.role==='student';
  const courses=await all(`SELECT c.* FROM courses c WHERE ${scope} ORDER BY c.rowid DESC`,...args);
+ for(const c of courses){if(!c.archived&&c.grading_mode==='weighted')c.published=0;}
  for(const c of courses)c.can_edit=u.role==='admin'||c.owner_id===u.id||(u.role==='teacher'&&!!await all('SELECT id FROM course_staff WHERE course_id=? AND user_id=? AND permission=?',c.id,u.id,'edit').then(x=>x.length));
  const periods=student?await all(`SELECT DISTINCT p.* FROM periods p JOIN courses c ON c.period_id=p.id WHERE ${scope} ORDER BY p.year DESC,p.term DESC`,...args):await all('SELECT * FROM periods ORDER BY year DESC,term DESC');
  const assignments=await all(`SELECT a.* FROM assignments a JOIN courses c ON c.id=a.course_id WHERE ${scope} ORDER BY a.due_at,a.id`,...args);
