@@ -64,10 +64,12 @@ Sites อ่าน `.openai/hosting.json` สำหรับ D1/R2 และใ�
 
 ```sh
 node node_modules/typescript/bin/tsc --noEmit
-node tests/integration.mjs
+node tests/integration.mjs  # ฐานข้อมูลทดสอบว่างเท่านั้น
 ```
 
 **Integration test ใช้ได้เฉพาะฐานข้อมูลทดสอบว่าง** สคริปต์จะหยุดเมื่อมีบัญชีครูแล้ว สร้างเฉพาะข้อมูลจำลอง ไม่ควรรันกับข้อมูลโรงเรียน ตั้ง `GRADE_TEST_URL` เพื่อใช้เครื่องทดสอบที่แยกไว้
+
+ใช้ `node tests/built-worker.mjs` หลัง build เพื่อทดสอบ Worker ที่ compile แล้วในฐานข้อมูลและไฟล์จำลองแยกอัตโนมัติ โดยไม่แตะข้อมูลในเครื่องหรือข้อมูลโรงเรียน
 
 ตรวจการตั้งค่าครูครั้งเดียว สิทธิ์ครู/นักเรียน การนำเข้าแบบไม่บันทึกบางส่วน การแยกปี/เทอม ประวัติรายชื่อและไฟล์รุ่นเก่า ขอบเขตคะแนน งานคืนแก้ การเผยแพร่/ถอนผลคะแนน และไฟล์ส่วนตัว `tests/grades-and-export.mjs` ตรวจการคำนวณและกรอกต้นแบบ Excel หลัง bundle โมดูลสำหรับทดสอบตาม README ใน tests
 
@@ -89,4 +91,5 @@ node tests/integration.mjs
 - `db/schema.ts`, `drizzle/`: Schema และ migration
 
 PDF.js (Apache-2.0), SheetJS (Apache-2.0), ExcelJS (MIT) และ Mammoth (BSD-2-Clause) ใช้ตาม license ของแต่ละโครงการ รูปแบบและระบบ build เริ่มจาก Vinext/Sites starter
+
 

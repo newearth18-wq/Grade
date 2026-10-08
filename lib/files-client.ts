@@ -58,3 +58,10 @@ export function fillTemplate(wb:any,config:TemplateConfig,rows:Record<string,unk
 }
 
 
+export function guessMapping(headers:string[]){
+ const code=Math.max(0,headers.findIndex(h=>/รหัส|student.?id|student.?code/i.test(h)));
+ const name=Math.max(0,headers.findIndex(h=>/ชื่อ|name/i.test(h)&&!/^(นามสกุล|last.?name|surname)$/i.test(h)));
+ const number=headers.findIndex(h=>/เลขที่|number|no\.?$/i.test(h));
+ const lastName=headers.findIndex(h=>/นามสกุล|last.?name|surname/i.test(h)&&!/(ชื่อ.*นามสกุล|full)/i.test(h));
+ return {code,name,number,lastName};
+}
