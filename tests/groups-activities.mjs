@@ -24,7 +24,7 @@ try{
  const a=await admin.call('assignments',taskBody,'POST',201);
  await s4.call(`groups/${a.id}`,undefined,'GET',403);await admin.call(`groups/${a.id}/create`,{name:'ครูไม่จับกลุ่มแทน'},'POST',403);
  const g=await s1.call(`groups/${a.id}/create`,{name:'ทีมต้นอ่อน'},'POST',201);await s1.call(`groups/${a.id}/create`,{name:'กลุ่มซ้ำ'},'POST',409);
- await s2.call(`groups/${a.id}/join`,{groupId:g.id});await s3.call(`groups/${a.id}/join`,{groupId:g.id},'POST',409);await s1.call(`groups/${a.id}/leave`,{},'POST',409);
+ const joined=await Promise.all([s2.call(`groups/${a.id}/join`,{groupId:g.id},'POST',[200,409]),s3.call(`groups/${a.id}/join`,{groupId:g.id},'POST',[200,409])]);assert.deepEqual(joined.map(r=>r._httpStatus).sort(),[200,409]);if(joined[1]._httpStatus===200){await s3.call(`groups/${a.id}/leave`,{});await s2.call(`groups/${a.id}/join`,{groupId:g.id});}await s3.call(`groups/${a.id}/join`,{groupId:g.id},'POST',409);await s1.call(`groups/${a.id}/leave`,{},'POST',409);
  await s2.call(`groups/${a.id}/leave`,{});await s2.call(`groups/${a.id}/join`,{groupId:g.id});await s1.call(`groups/${a.id}/rename`,{name:'ทีมร่มไทร'});
  await admin.call(`assignments/${a.id}`,{...taskBody,groupMax:2,isGroup:false},'PATCH',409);
  pass('Students create, rename, join and leave groups within own room; one group per assignment and capacity enforced');
