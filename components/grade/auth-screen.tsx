@@ -1,0 +1,11 @@
+'use client';
+import { useState } from 'react';
+import { GraduationCap, ClipboardCheck, BarChart3, FileSpreadsheet, LogIn } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { api } from '@/lib/client';
+import { BusyButton } from './shared';
+export function AuthScreen({setup,onDone}:{setup:boolean;onDone:()=>Promise<any>}){
+ const [busy,setBusy]=useState(false),[error,setError]=useState('');
+ async function submit(e:React.FormEvent<HTMLFormElement>){e.preventDefault();setBusy(true);setError('');const form=new FormData(e.currentTarget);try{await api(setup?'setup':'login',{name:form.get('name'),username:form.get('username'),password:form.get('password')});await onDone();}catch(err){setError(err instanceof Error?err.message:'เข้าสู่ระบบไม่สำเร็จ');}finally{setBusy(false);}}
+ return <><div className="page-heading"><div><p className="eyebrow">Grade.</p><h1>{setup?'เริ่มต้นโลกแห่งการเรียนรู้':'กลับสู่โลกแห่งการเรียนรู้'}</h1><p className="muted">ส่งงานของคุณ และค้นพบความก้าวหน้าในทุกวิชา</p></div></div><div className="setup-grid"><form onSubmit={submit} className="panel setup-form"><div className="section-title"><div><h2>{setup?'สร้างบัญชีครู':'เข้าสู่ห้องเรียน'}</h2><p className="muted">{setup?'ตั้งค่าครั้งแรก แล้วเพิ่มรายวิชาและนักเรียนได้เลย':'นักเรียนใช้รหัสนักเรียนเป็นชื่อผู้ใช้และรหัสผ่านเริ่มต้น'}</p></div></div>{setup&&<label>ชื่อครู<Input name="name" required maxLength={100} placeholder="ชื่อ–นามสกุล" autoComplete="name"/></label>}<label>{setup?'ชื่อผู้ใช้ครู':'ชื่อผู้ใช้ / รหัสนักเรียน'}<Input name="username" required maxLength={40} pattern={setup?'[a-zA-Z0-9_.-]{3,40}':undefined} placeholder={setup?'เช่น teacher':'ชื่อผู้ใช้หรือรหัสนักเรียน'} autoComplete="username"/></label><label>รหัสผ่าน<Input name="password" type="password" required minLength={setup?10:undefined} maxLength={128} placeholder={setup?'อย่างน้อย 10 ตัวอักษร':'กรอกรหัสผ่าน'} autoComplete={setup?'new-password':'current-password'}/></label>{error&&<p className="error" role="alert">{error}</p>}<BusyButton type="submit" busy={busy} className="w-full">{setup?'สร้างบัญชีครู':'เข้าสู่ห้องเรียน'}</BusyButton>{!setup&&<p className="muted">เปลี่ยนรหัสผ่านเองได้หลังเข้าสู่ระบบ · หากลืมรหัสผ่าน ติดต่อครูผู้ดูแล</p>}</form></div></>;
+}
