@@ -35,6 +35,9 @@ async function saveUploads(form:FormData,a:any,u:User,revision:number,sample=fal
 }
 function invalidateCourse(id:string){return stmt('UPDATE courses SET published=0,grading_mode=\'points\',revision=revision+1 WHERE id=?',id);}
 function insertFile(f:any){return stmt('INSERT INTO files (id,course_id,assignment_id,student_id,revision,name,mime,size,created_at) VALUES (?,?,?,?,?,?,?,?,?)',f.id,f.course_id,f.assignment_id,f.student_id,f.revision,f.name,f.mime,f.size,f.created_at);}
+function requestKey(value:FormDataEntryValue|null){if(value===null)return uid();if(typeof value!=='string'||!/^[a-zA-Z0-9_-]{16,100}$/.test(value))fail(400,'รหัสคำขอส่งงานไม่ถูกต้อง');return value;}
+async function receipt(u:User,requestId:string,assignmentId:string){const row=await one('SELECT assignment_id,revision,created_at FROM submission_receipts WHERE student_id=? AND request_id=?',u.id,requestId);if(row&&row.assignment_id!==assignmentId)fail(409,'รหัสคำขอนี้ใช้กับงานอื่นแล้ว');return row?{ok:true,recovered:true,revision:row.revision,submittedAt:row.created_at}:null;}
+function uploadReceipt(u:User,a:any,requestId:string,id:string,revision:number,stamp:string){return stmt('INSERT INTO submission_receipts(id,student_id,assignment_id,request_id,revision,created_at) SELECT ?,?,?,?,?,? WHERE changes()=1',id,u.id,a.id,requestId,revision,stamp);}
 async function handle(r:Request){
  const path=new URL(r.url).pathname.replace(/^\/api\//,'').replace(/\/$/,'');const method=r.method;
  if(method!=='GET')ensureSameOrigin(r);
@@ -134,14 +137,19 @@ async function handle(r:Request){
   const permitted:any[]=[];for(const id of targets){const access=await assignmentAccess(u,id,true);if(access.c.archived)fail(409,'รายวิชาเก็บเข้าประวัติแล้ว');permitted.push(access);}if(permitted.some(x=>x.c.subject_id!==permitted[0].c.subject_id))fail(400,'เลือกงานจากวิชาเดียวกัน');
   const fs=[];try{for(const {a} of permitted)fs.push(...await saveUploads(form,a,u,0,true));if(!fs.length)fail(400,'กรุณาแนบไฟล์');await database().batch([...fs.map(insertFile),...permitted.map(({c})=>stmt('UPDATE courses SET revision=revision+1 WHERE id=?',c.id))]);}catch(e){await Promise.all(fs.map(f=>bucket().delete(f.id)));throw e;}return reply({ok:true},201);
  }
+ if(path==='submission-status'&&method==='GET'){
+  if(u.role!=='student')fail(403,'เฉพาะนักเรียนเท่านั้น');const q=new URL(r.url).searchParams,assignmentId=q.get('assignmentId')||'',requestId=requestKey(q.get('requestId'));await assignmentAccess(u,assignmentId);return reply({receipt:await receipt(u,requestId,assignmentId)});
+ }
  if(path==='submit'&&method==='POST'){
-  if(u.role!=='student')fail(403,'เฉพาะนักเรียนเท่านั้น');const form=await r.formData();const {a,c}=await assignmentAccess(u,String(form.get('assignmentId')));if(c.archived||c.published)fail(409,'รายวิชานี้ปิดรับงานแล้ว');
-  if(a.is_group)return submitGroup(form,a,c,u);
+  if(u.role!=='student')fail(403,'เฉพาะนักเรียนเท่านั้น');const form=await r.formData();const {a,c}=await assignmentAccess(u,String(form.get('assignmentId')));
+  const requestId=requestKey(form.get('requestId')),previous=await receipt(u,requestId,a.id);if(previous)return reply(previous,201);if(c.archived||c.published)fail(409,'รายวิชานี้ปิดรับงานแล้ว');
+  if(a.is_group)return submitGroup(form,a,c,u,requestId);
   const old=await one('SELECT * FROM submissions WHERE assignment_id=? AND student_id=? AND deleted=0',a.id,u.id);if(old)await requireLive('submission',old.id);if(old&&old.status!=='returned')fail(409,'ส่งงานแล้ว ให้ครูส่งคืนก่อนแก้ไขงาน');
-  const revision=(old?.revision||0)+1;const fs=await saveUploads(form,a,u,revision);const note=String(form.get('note')||'').slice(0,3000);
-  try{const op=old?stmt("UPDATE submissions SET note=?,submitted_at=?,score=NULL,feedback='',rubric_scores='[]',source='upload',status='pending',revision=?,reviewed_at=NULL WHERE id=? AND revision=? AND status='returned'",note,now(),revision,old.id,old.revision):stmt("INSERT INTO submissions (id,assignment_id,student_id,note,submitted_at,score,feedback,status,revision) VALUES (?,?,?,?,?,NULL,'','pending',?)",uid(),a.id,u.id,note,now(),revision);
-   const result=await database().batch([op,...fs.map(insertFile),invalidateCourse(c.id)]);if(result[0].meta.changes!==1){await database().batch(fs.map(f=>stmt('DELETE FROM files WHERE id=?',f.id)));fail(409,'งานเปลี่ยนระหว่างส่ง กรุณาโหลดใหม่');}
-  }catch(e){await Promise.all(fs.map(f=>bucket().delete(f.id)));throw e;}await log(u.id,c.id,'submission',{assignmentId:a.id,revision});return reply({ok:true},201);
+  const revision=(old?.revision||0)+1;const fs=await saveUploads(form,a,u,revision);const note=String(form.get('note')||'').slice(0,3000),stamp=now(),receiptId=uid();
+  const open="EXISTS(SELECT 1 FROM courses c WHERE c.id=? AND c.archived=0 AND c.published=0 AND NOT EXISTS(SELECT 1 FROM trash_entries t WHERE (t.kind='course' AND t.record_id=c.id) OR (t.kind='period' AND t.record_id=c.period_id) OR (t.kind='subject' AND t.record_id=c.subject_id))) AND NOT EXISTS(SELECT 1 FROM trash_entries WHERE kind='assignment' AND record_id=?) AND EXISTS(SELECT 1 FROM enrollments WHERE course_id=? AND student_id=? AND active=1 AND deleted=0)",openArgs=[c.id,a.id,c.id,u.id],guard='EXISTS(SELECT 1 FROM submission_receipts WHERE id=?)';
+  try{const op=old?stmt(`UPDATE submissions SET note=?,submitted_at=?,score=NULL,feedback='',rubric_scores='[]',source='upload',status='pending',revision=?,reviewed_at=NULL WHERE id=? AND revision=? AND status='returned' AND deleted=0 AND ${open}`,note,stamp,revision,old.id,old.revision,...openArgs):stmt(`INSERT INTO submissions (id,assignment_id,student_id,note,submitted_at,score,feedback,status,revision) SELECT ?,?,?,?,?,NULL,'','pending',? WHERE ${open}`,uid(),a.id,u.id,note,stamp,revision,...openArgs);
+   const result=await database().batch([op,uploadReceipt(u,a,requestId,receiptId,revision,stamp),...fs.map(f=>stmt(`INSERT INTO files(id,course_id,assignment_id,student_id,revision,name,mime,size,created_at) SELECT ?,?,?,?,?,?,?,?,? WHERE ${guard}`,f.id,f.course_id,f.assignment_id,f.student_id,f.revision,f.name,f.mime,f.size,f.created_at,receiptId)),stmt(`UPDATE courses SET published=0,grading_mode='points',revision=revision+1 WHERE id=? AND ${guard}`,c.id,receiptId),stmt(`INSERT INTO audit(id,actor_id,course_id,action,detail,created_at) SELECT ?,?,?,?,?,? WHERE ${guard}`,uid(),u.id,c.id,'submission',JSON.stringify({assignmentId:a.id,revision}),stamp,receiptId)]);if(result[0].meta.changes!==1)fail(409,'งานหรือรายวิชาเปลี่ยนระหว่างส่ง กรุณาโหลดใหม่');
+  }catch(e){await Promise.all(fs.map(f=>bucket().delete(f.id)));const done=await receipt(u,requestId,a.id);if(done)return reply(done,201);if((e as Error).message.includes('UNIQUE'))fail(409,'มีการส่งงานจากอีกหน้าแล้ว กรุณาโหลดใหม่');throw e;}return reply({ok:true,revision,submittedAt:stamp},201);
  }
  if(path.startsWith('review/')&&method==='PATCH'){
   teacher(u);const id=path.slice(7);await requireLive('submission',id);const s=await one('SELECT * FROM submissions WHERE id=?',id);if(!s)fail(404,'ไม่พบงานที่ส่ง');const {a,c}=await assignmentAccess(u,s!.assignment_id,true);if(c.archived)fail(409,'รายวิชาเก็บเข้าประวัติแล้ว');const b=await jsonBody(r);if('expectedReviewedAt' in b&&b.expectedReviewedAt!==s!.reviewed_at)fail(409,'ครูอีกคนแก้คะแนนแล้ว กรุณาเปิดงานใหม่');if('expectedRubric' in b&&b.expectedRubric!==a.rubric)fail(409,'เกณฑ์คะแนนเปลี่ยนแล้ว กรุณาเปิดงานใหม่');if(s!.group_id&&await one('SELECT id FROM submissions WHERE group_id=? AND assignment_id=? AND deleted=0 AND (revision<>? OR reviewed_at IS NOT ?)',s!.group_id,s!.assignment_id,s!.revision,s!.reviewed_at))fail(409,'ข้อมูลกลุ่มไม่ตรงกัน ให้ครูกู้คืนหรือตรวจข้อมูลกลุ่มก่อน');const status=b.returned?'returned':'graded';let score=b.returned?null:number(b.score,'คะแนน',0,a.max_score);const rubric=parseRubric(a.rubric);if(!b.returned&&rubric.length)try{score=rubricScore(rubric,b.rubricScores);}catch(e){fail(400,(e as Error).message);}const rev=integer(b.revision,'รุ่นงาน',1,10000);const feedback=typeof b.feedback==='string'?b.feedback.slice(0,5000):'';
@@ -157,18 +165,19 @@ export const GET=route;export const POST=route;export const PATCH=route;
 
 
 
-async function submitGroup(form:FormData,a:any,c:any,u:User){
+async function submitGroup(form:FormData,a:any,c:any,u:User,requestId:string){
  const {g,members}=await submissionGroup(u,a);const old=await all('SELECT * FROM submissions WHERE assignment_id=? AND student_id IN(SELECT value FROM json_each(?))',a.id,JSON.stringify(members));
  if(old.some(s=>s.deleted||s.status!=='returned'))fail(409,'กลุ่มส่งงานแล้ว ให้ครูส่งคืนก่อนแก้ไข');if(old.length&&old.length!==members.length)fail(409,'ข้อมูลกลุ่มบางส่วนอยู่ในถังขยะ ให้ครูกู้คืนทั้งกลุ่มก่อน');
  const revision=Math.max(0,...old.map(s=>s.revision))+1,token=uid(),saved:any[]=[];const stamp=now(),note=String(form.get('note')||'').slice(0,3000);
  try{
   for(const studentId of members)saved.push(...await saveUploads(form,a,{...u,id:studentId},revision));
   const guard='EXISTS(SELECT 1 FROM work_groups WHERE id=? AND submission_token=?)';
-  const ops=[stmt('UPDATE work_groups SET sealed=1,submission_token=?,revision=revision+1 WHERE id=? AND revision=?',token,g.id,g.revision)];
+  const ops=[stmt(`UPDATE work_groups SET sealed=1,submission_token=?,revision=revision+1 WHERE id=? AND revision=? AND EXISTS(SELECT 1 FROM courses c WHERE c.id=? AND c.archived=0 AND c.published=0 AND NOT EXISTS(SELECT 1 FROM trash_entries t WHERE (t.kind='course' AND t.record_id=c.id) OR (t.kind='period' AND t.record_id=c.period_id) OR (t.kind='subject' AND t.record_id=c.subject_id))) AND NOT EXISTS(SELECT 1 FROM trash_entries WHERE kind='assignment' AND record_id=?)`,token,g.id,g.revision,c.id,a.id),uploadReceipt(u,a,requestId,uid(),revision,stamp)];
   for(const studentId of members){const prev=old.find(s=>s.student_id===studentId);ops.push(prev?stmt(`UPDATE submissions SET note=?,submitted_at=?,score=NULL,feedback='',rubric_scores='[]',source='upload',status='pending',individual_score=NULL,group_id=?,revision=?,reviewed_at=NULL WHERE id=? AND ${guard}`,note,stamp,g.id,revision,prev.id,g.id,token):stmt(`INSERT INTO submissions(id,assignment_id,student_id,group_id,note,submitted_at,status,revision) SELECT ?,?,?,?,?,?,'pending',? WHERE ${guard}`,uid(),a.id,studentId,g.id,note,stamp,revision,g.id,token));}
   for(const f of saved)ops.push(stmt(`INSERT INTO files(id,course_id,assignment_id,student_id,revision,name,mime,size,created_at) SELECT ?,?,?,?,?,?,?,?,? WHERE ${guard}`,f.id,f.course_id,f.assignment_id,f.student_id,f.revision,f.name,f.mime,f.size,f.created_at,g.id,token));
   ops.push(stmt(`UPDATE courses SET published=0,grading_mode='points',revision=revision+1 WHERE id=? AND ${guard}`,c.id,g.id,token));
+  ops.push(stmt(`INSERT INTO audit(id,actor_id,course_id,action,detail,created_at) SELECT ?,?,?,?,?,? WHERE ${guard}`,uid(),u.id,c.id,'group_submission',JSON.stringify({assignmentId:a.id,groupId:g.id,members,revision}),stamp,g.id,token));
   const result=await database().batch(ops);if(!result[0].meta.changes)fail(409,'สมาชิกหรือการส่งงานเปลี่ยนระหว่างส่ง กรุณาโหลดใหม่');
- }catch(e){await Promise.all(saved.map(f=>bucket().delete(f.id)));throw e;}
- await log(u.id,c.id,'group_submission',{assignmentId:a.id,groupId:g.id,members,revision});return reply({ok:true},201);
+ }catch(e){await Promise.all(saved.map(f=>bucket().delete(f.id)));const done=await receipt(u,requestId,a.id);if(done)return reply(done,201);throw e;}
+ return reply({ok:true,revision,submittedAt:stamp},201);
 }

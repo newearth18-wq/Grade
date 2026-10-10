@@ -4,6 +4,8 @@ export const users = sqliteTable('users', {
  id:text('id').primaryKey(), username:text('username').notNull().unique(), name:text('name').notNull(), role:text('role').notNull(), password:text('password').notNull(), active:integer('active').notNull().default(1), mustChange:integer('must_change').notNull().default(0), createdAt:text('created_at').notNull()
 });
 export const settings = sqliteTable('settings',{key:text('key').primaryKey(),value:text('value').notNull()});
+// Operational receipts belong to the original upload, so restore/copy never replays them.
+export const submissionReceipts=sqliteTable('submission_receipts',{id:text('id').primaryKey(),studentId:text('student_id').notNull(),assignmentId:text('assignment_id').notNull(),requestId:text('request_id').notNull(),revision:integer('revision').notNull(),createdAt:text('created_at').notNull()},t=>[uniqueIndex('submission_receipt_request').on(t.studentId,t.requestId)]);
 export const sessions = sqliteTable('sessions',{token:text('token').primaryKey(),userId:text('user_id').notNull().references(()=>users.id),expires:integer('expires').notNull()});
 export const loginLimits = sqliteTable('login_limits',{key:text('key').primaryKey(),count:integer('count').notNull(),expires:integer('expires').notNull()});
 export const periods=sqliteTable('periods',{deleted:integer('deleted').notNull().default(0),id:text('id').primaryKey(),ownerId:text('owner_id').notNull().references(()=>users.id),year:integer('year').notNull(),term:integer('term').notNull()},t=>[uniqueIndex('period_owner_year_term').on(t.ownerId,t.year,t.term).where(sql`${t.deleted}=0`)]);

@@ -1,5 +1,9 @@
 # Tests
 
+- `node tests/reliability-logic.mjs` checks pending exam answer reconciliation, upload limits, disabled busy buttons and readable network errors.
+- `node tests/reliability-worker.mjs` creates disposable D1/R2, checks lost upload responses, concurrent uploads/corrections, group retries, receipt privacy, 30 concurrent requests and exam disconnect/unlock.
+- For UI fault testing, set `GRADE_READY_PREVIEW=1` for that suite, then run `node tests/reliability-preview-proxy.mjs`; the proxy targets only loopback `:8788`. Its `:8789/__qa/mode?value=...` accepts `normal`, `exam-outage`, `exam-write-outage`, `drop-submit` and `uncertain-submit`. Stop both processes after QA. These endpoints are not application routes and never ship in the Worker.
+
 - `node tests/integration.mjs` against an empty local development database; optional `GRADE_TEST_URL` chooses another disposable server.
 - `node tests/build-tests.mjs` then `node tests/grades-and-export.mjs` verifies score logic, Excel import and SGS template integrity. Test bundles and generated sample files are ignored under `.sites-runtime`.
 
