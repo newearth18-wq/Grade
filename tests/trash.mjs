@@ -20,7 +20,7 @@ const a=(await admin('assignments',{courseId:c1,title:'งานตรวจแ�
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
 const upload=new FormData();upload.set('assignmentId',a);upload.append('files',new Blob([png],{type:'image/png'}),'original.png');await student('submit',upload,'POST',201);
 state=await admin('state');const s=state.submissions.find(s=>s.assignment_id===a),f=state.files.find(f=>f.assignment_id===a);
-await admin(`review/${s.id}`,{score:10,revision:1,feedback:'ครบถ้วน'},'PATCH');await admin(`enrollments/${e.id}`,{mid:20,final:20},'PATCH');await admin(`courses/${c1}`,{published:true},'PATCH');
+await admin(`review/${s.id}`,{score:10,revision:1,feedback:'ครบถ้วน'},'PATCH');await admin(`enrollments/${e.id}`,{mid:20,final:20},'PATCH');await admin(`courses/${c1}`,{published:true,acknowledgeUnallocated:true},'PATCH');
 await student('trash/preview',{kind:'assignment',id:a},'POST',403);await viewer('trash/preview',{kind:'course',id:c1},'POST',403);await teacher('trash/preview',{kind:'assignment',id:a},'POST',403);await teacher('trash/preview',{kind:'reset',id:'all'},'POST',403);await teacher('trash/preview',{kind:'student',id:studentId},'POST',403);
 console.log('PASS Trash role boundaries, student account edit and historical roster isolation');
 const remove=async(kind,id,call=admin)=>{const preview=await call('trash/preview',{kind,id});return call('trash',{kind,id,signature:preview.signature});};

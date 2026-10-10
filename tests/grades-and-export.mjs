@@ -17,3 +17,5 @@ assert.throws(()=>fillTemplate(reread,config,results,true),/ข้อมูล�
 console.log('PASS SGS template preview, ID matching, score writes, formulas/styles/sheets preservation and rejection cases');
 await mkdir('.sites-runtime/fixtures',{recursive:true});await writeFile('.sites-runtime/fixtures/students.xlsx',bytes);await writeFile('.sites-runtime/fixtures/sgs-filled.xlsx',await template.xlsx.writeBuffer());console.log('3 additional test groups passed.');
 
+
+const mergedBook=new ExcelJS.Workbook();const mergedSheet=mergedBook.addWorksheet('คะแนน');mergedSheet.getCell('A2').value='00001';mergedSheet.getCell('A3').value='00002';mergedSheet.mergeCells('E3:F3');assert.throws(()=>fillTemplate(mergedBook,config,results,true),/รวม|merge/i);assert.equal(mergedSheet.getCell('D2').value,null);console.log('PASS Merged destination blocks the entire SGS template write before any cell changes');
