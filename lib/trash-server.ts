@@ -15,6 +15,7 @@ async function plan(u:User,kind:string,id:string){
  if(['student','reset'].includes(kind)&&u.role!=='admin')fail(403,'เฉพาะผู้ดูแลระบบลบบัญชีหรือข้อมูลทั้งหมดได้');
  const target=kind==='reset'?null:await one(`SELECT * FROM ${tables[kind]} WHERE id=?`,id);
  if(kind!=='reset'){if(!target)fail(404,'ไม่พบข้อมูล');await requireLive(kind,id);}
+ if(kind==='submission'&&target!.group_id){const allGroup=await all('SELECT * FROM submissions WHERE group_id=? AND assignment_id=? AND deleted=0',target!.group_id,target!.assignment_id);for(const record of allGroup){await requireLive('submission',record.id);}}
  if(kind==='student'&&target!.role!=='student')fail(403,'ไม่สามารถลบบัญชีครูหรือผู้ดูแลจากหน้านี้');
  if(['period','subject','profile'].includes(kind)&&target!.owner_id!==u.id&&u.role!=='admin')fail(403,'ไม่มีสิทธิ์จัดการข้อมูลนี้');
  if(kind==='profile'&&target!.owner_id!==u.id)fail(403,'แบบส่งออกเป็นข้อมูลส่วนตัวของครู');
@@ -52,8 +53,8 @@ async function plan(u:User,kind:string,id:string){
   if(full||kind==='student')for(const e of await all('SELECT * FROM enrollments WHERE course_id IN(SELECT value FROM json_each(?))'+(kind==='student'?' AND student_id=?':''),courseIds,...(kind==='student'?[id]:[])))add('enrollment',e);
   const taskIds=new Set(tasks.filter(a=>full||kind==='assignment'&&a.id===id||['enrollment','student'].includes(kind)||kind==='submission'&&a.id===target!.assignment_id).map(a=>a.id));
   const studentId=kind==='student'?id:kind==='enrollment'?target!.student_id:kind==='submission'?target!.student_id:null;
-  for(const s of await all('SELECT s.* FROM submissions s JOIN assignments a ON a.id=s.assignment_id WHERE a.course_id IN(SELECT value FROM json_each(?))',courseIds))if(taskIds.has(s.assignment_id)&&(!studentId||s.student_id===studentId))add('submission',s);
-  for(const f of await all('SELECT * FROM files WHERE course_id IN(SELECT value FROM json_each(?))',courseIds))if(taskIds.has(f.assignment_id)&&(!studentId||f.student_id===studentId))add('file',f);
+  for(const s of await all('SELECT s.* FROM submissions s JOIN assignments a ON a.id=s.assignment_id WHERE a.course_id IN(SELECT value FROM json_each(?))',courseIds))if(taskIds.has(s.assignment_id)&&(!studentId||s.student_id===studentId||kind==='submission'&&target!.group_id&&s.group_id===target!.group_id))add('submission',s);
+  for(const f of await all('SELECT * FROM files WHERE course_id IN(SELECT value FROM json_each(?))',courseIds))if(taskIds.has(f.assignment_id)&&(!studentId||f.student_id===studentId||kind==='submission'&&target!.group_id&&await one('SELECT id FROM submissions WHERE group_id=? AND assignment_id=? AND student_id=?',target!.group_id,f.assignment_id,f.student_id)))add('file',f);
   for(const x of await all('SELECT x.* FROM extensions x JOIN assignments a ON a.id=x.assignment_id WHERE a.course_id IN(SELECT value FROM json_each(?))',courseIds))if(kind!=='submission'&&taskIds.has(x.assignment_id)&&(!studentId||x.student_id===studentId))add('extension',x);
  }
  items.sort((a,b)=>`${a.kind}:${a.id}`.localeCompare(`${b.kind}:${b.id}`));
@@ -82,6 +83,7 @@ async function restore(u:User,id:string){
   if(['exam','assignment','enrollment','file'].includes(e.kind)){await check('course',row!.course_id);affected.add(row!.course_id);}
   if(['submission','extension','file'].includes(e.kind))await check('assignment',row!.assignment_id);
   if(['examAttempt','enrollment','submission','extension','file'].includes(e.kind))await check('student',row!.student_id);
+  if(e.kind==='exam'){const parent=await one('SELECT course_type FROM courses WHERE id=?',row!.course_id);if(parent?.course_type==='activity')fail(409,'วิชากิจกรรมไม่มีสอบ เปลี่ยนประเภทวิชาก่อนกู้คืนข้อสอบ');}
   if(e.kind==='examAttempt'){check('exam',row!.exam_id);check('enrollment',row!.enrollment_id);const parent=await one('SELECT course_id FROM exams WHERE id=?',row!.exam_id);if(parent)affected.add(parent.course_id);}
   if(e.kind==='submission'||e.kind==='extension'){const a=parentTasks.get(row!.assignment_id);if(a)affected.add(a.course_id);}
   if(['period','subject','profile'].includes(e.kind)&&row!.owner_id!==u.id&&u.role!=='admin')fail(403,'ไม่มีสิทธิ์กู้คืนข้อมูลนี้');
