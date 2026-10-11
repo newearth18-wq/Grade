@@ -1,6 +1,7 @@
 import type { ImportRow } from './client';
 import { download } from './client';
 import { calculateGrade } from './grades';
+import {sgsColumns,sgsStage,type SgsStage} from './sgs-stage';
 export type ParsedFile={headers:string[];rows:string[][];source:string};
 const cellString=(v:unknown)=>v===null||v===undefined?'':String(v).trim();
 function sheetRows(rows:unknown[][],source:string):ParsedFile{
@@ -42,17 +43,23 @@ export async function exportWorkbook(rows:Record<string,unknown>[],filename:stri
  ws.getRow(1).font={bold:true,color:{argb:'FFFFFFFF'}};ws.getRow(1).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF214ED3'}};ws.getRow(1).height=26;ws.views=[{state:'frozen',ySplit:1}];if(headers.length)ws.autoFilter={from:{row:1,column:1},to:{row:1,column:headers.length}};const data=await wb.xlsx.writeBuffer();download(data as BlobPart,filename,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 }
 export function resultRows(state:any,course:any){return state.enrollments.filter((e:any)=>e.course_id===course.id&&e.active).map((e:any)=>{const g=calculateGrade(course,state.assignments,state.submissions,e);return {'เลขที่':e.number,'รหัสนักเรียน':e.student_code,'ชื่อ-นามสกุล':e.name,'ปีการศึกษา':state.periods.find((p:any)=>p.id===course.period_id)?.year,'ภาคเรียน':state.periods.find((p:any)=>p.id===course.period_id)?.term,'รหัสวิชา':course.code,'ห้องเรียน':course.classroom,'คะแนนเก็บก่อนกลางภาค':g.phases.before.earned,'กลางภาค':g.mid??'','คะแนนเก็บหลังกลางภาค':g.phases.after.earned,'ปลายภาค':g.final??'','คะแนนเก็บ':g.work,'คะแนนรวม':g.complete?g.total:'','เกรด':g.grade??'รอตรวจ','งานขาด':g.missing,'ชั่วโมงเข้าร่วม':e.attendance?.hours??0,'ร้อยละเข้าร่วม':e.attendance?.percent??0};});}
-export type TemplateConfig={sheet:string;startRow:number;idColumn:string;workColumn:string;beforeWorkColumn?:string;afterWorkColumn?:string;midColumn:string;finalColumn:string;totalColumn:string;gradeColumn:string;allowOverwrite:boolean};
+export type TemplateConfig={sheet:string;startRow:number;idColumn:string;workColumn:string;beforeWorkColumn?:string;afterWorkColumn?:string;midColumn:string;finalColumn:string;totalColumn:string;gradeColumn:string;allowOverwrite:boolean;exportStage?:SgsStage};
+export function stageResultRows(state:any,course:any,stage:SgsStage){
+ const rows=resultRows(state,course);if(stage==='all')return rows;
+ const work=stage==='midterm'?'คะแนนเก็บก่อนกลางภาค':'คะแนนเก็บหลังกลางภาค',exam=stage==='midterm'?'กลางภาค':'ปลายภาค';
+ return rows.map((row:Record<string,unknown>)=>{const {'เลขที่':number,'รหัสนักเรียน':code,'ชื่อ-นามสกุล':name,'ปีการศึกษา':year,'ภาคเรียน':term,'รหัสวิชา':subject,'ห้องเรียน':room}=row;return {'เลขที่':number,'รหัสนักเรียน':code,'ชื่อ-นามสกุล':name,'ปีการศึกษา':year,'ภาคเรียน':term,'รหัสวิชา':subject,'ห้องเรียน':room,[work]:row[work],[exam]:row[exam],'รวมช่วง':typeof row[exam]==='number'?Math.round((Number(row[work])+Number(row[exam]))*100)/100:''};});
+}
 export async function readTemplate(file:File){if(!/\.xlsx$/i.test(file.name))throw new Error('ไฟล์ต้นแบบต้องเป็น .xlsx');if(file.size>15*1024*1024)throw new Error('ไฟล์ต้องไม่เกิน 15 MB');const excel=await import('exceljs');const ExcelJS=excel.default||excel;const wb=new ExcelJS.Workbook();await wb.xlsx.load(await file.arrayBuffer());return wb;}
 export function fillTemplate(wb:any,config:TemplateConfig,rows:Record<string,unknown>[],apply=false){
+ const stage=sgsStage(config.exportStage);config=sgsColumns(config);
  const ws=wb.getWorksheet(config.sheet);if(!ws)throw new Error('ไม่พบแผ่นงาน');if(!Number.isInteger(config.startRow)||config.startRow<1||config.startRow>10000)throw new Error('แถวเริ่มต้นไม่ถูกต้อง');
  const fields=['คะแนนเก็บก่อนกลางภาค','กลางภาค','คะแนนเก็บหลังกลางภาค','ปลายภาค','คะแนนเก็บ','คะแนนรวม','เกรด'];
  const columns=[config.idColumn,config.beforeWorkColumn??'',config.midColumn,config.afterWorkColumn??'',config.finalColumn,config.workColumn,config.totalColumn,config.gradeColumn].map(c=>c.trim().toUpperCase());if(!/^[A-Z]{1,3}$/.test(columns[0]))throw new Error('กรุณาระบุคอลัมน์รหัสนักเรียน เช่น A');if(columns.slice(1).some(c=>c&&!/^[A-Z]{1,3}$/.test(c)))throw new Error('คอลัมน์ต้องเป็นตัวอักษร เช่น D');const nonempty=columns.filter(Boolean);if(new Set(nonempty).size!==nonempty.length)throw new Error('คอลัมน์รหัสและคะแนนต้องไม่ซ้ำกัน');if(!columns.slice(1).some(Boolean))throw new Error('ระบุคอลัมน์คะแนนอย่างน้อยหนึ่งคอลัมน์');
  const studentMap=new Map(rows.map(r=>[String(r['รหัสนักเรียน']).trim(),r]));const seen=new Set();const changes:any[]=[];const unmatched:any[]=[];const conflicts:any[]=[];
  for(let row=config.startRow;row<=Math.min(ws.rowCount,10000);row++){const cell=ws.getCell(`${columns[0]}${row}`);const code=String(cell.text||cell.value||'').trim();if(!code)continue;const student=studentMap.get(code);if(!student){unmatched.push({row,code});continue;}if(seen.has(code))throw new Error(`รหัส ${code} ซ้ำในไฟล์ต้นแบบ`);seen.add(code);
-  if(student['เกรด']==='รอตรวจ')throw new Error(`ยังตรวจหรือกรอกคะแนนของ ${code} ไม่ครบ`);
+  if(stage==='all'&&student['เกรด']==='รอตรวจ')throw new Error(`ยังตรวจหรือกรอกคะแนนของ ${code} ไม่ครบ`);
   if((columns[1]||columns[3])&&Math.abs(Number(student['คะแนนเก็บก่อนกลางภาค'])+Number(student['คะแนนเก็บหลังกลางภาค'])-Number(student['คะแนนเก็บ']))>.0001)throw new Error(`คะแนนเก็บแยกช่วงของ ${code} ไม่ตรงคะแนนเก็บรวม กรุณาใช้ช่องคะแนนเก็บรวมสำหรับเทอมเก่าที่คำนวณตามสัดส่วน`);
-  fields.forEach((field,i)=>{if(!columns[i+1])return;const target=ws.getCell(`${columns[i+1]}${row}`);const value=student[field];if(value===undefined)throw new Error(`ไม่มีข้อมูล ${field} ของ ${code}`);if(target.value!==null&&target.value!==undefined&&target.value!==''&&!config.allowOverwrite){conflicts.push({cell:target.address,code});return;}changes.push({cell:target.address,code,field,value});});
+  fields.forEach((field,i)=>{if(!columns[i+1])return;const target=ws.getCell(`${columns[i+1]}${row}`);const value=student[field];if(value===undefined)throw new Error(`ไม่มีข้อมูล ${field} ของ ${code}`);if(stage!=='all'&&(typeof value!=='number'||!Number.isFinite(value)||value<0))throw new Error(`ยังกรอก ${field} ของ ${code} ไม่ครบ`);if(target.value!==null&&target.value!==undefined&&target.value!==''&&!config.allowOverwrite){conflicts.push({cell:target.address,code});return;}changes.push({cell:target.address,code,field,value});});
  }
  for(const change of changes){if(ws.getCell(change.cell).isMerged)throw new Error(`เซลล์ ${change.cell} ถูกรวม กรุณาแก้ต้นแบบก่อน`);}
  const missing=rows.filter(r=>!seen.has(String(r['รหัสนักเรียน']).trim())).map(r=>r['รหัสนักเรียน']);
