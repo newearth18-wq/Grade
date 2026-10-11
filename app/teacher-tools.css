@@ -1,0 +1,31 @@
+.teacher-focus.grade-shell {background:#f4f6fb!important;color:#16233e}
+.teacher-focus .experience-atmosphere,.teacher-focus .atmosphere,.teacher-focus .ambient-orb,.teacher-focus .bubble-field {display:none!important}
+.teacher-focus .panel,.teacher-focus .filterbar,.teacher-focus .notice,.teacher-focus .result-summary {background:#fff!important;color:#16233e;border:1px solid #d6dfed;box-shadow:0 2px 7px #1224400a;backdrop-filter:none}
+.teacher-focus .muted,.teacher-focus small,.teacher-focus .cell-sub {color:#52617c!important}
+.teacher-focus .experience-user {color:#263653}
+.teacher-focus .experience-brand {color:#5433a3}
+.teacher-focus .table-wrap td {background:#fff}
+.teacher-focus .table-wrap tbody tr:nth-child(even) td {background:#f6f8fc}
+.teacher-focus .table-wrap th {background:#eaf0fa;color:#223658}
+.score-plan span {display:block;margin-top:.35rem}
+.work-shell .table-wrap {max-height:70vh;overflow:auto;isolation:isolate}
+.work-shell .table-wrap th {position:sticky;top:0;z-index:2;background:#f8f9ff;white-space:normal;min-width:95px}
+.work-shell .table-wrap td:first-child,.work-shell .table-wrap th:first-child {position:sticky;left:0;z-index:1;background:#f8f9ff;min-width:65px}
+.work-shell .table-wrap th:first-child {z-index:3}
+.result-table .table-wrap td:nth-child(2),.result-table .table-wrap th:nth-child(2) {position:sticky;left:65px;background:#f8f9ff;z-index:1;min-width:150px}
+.result-table .table-wrap th:nth-child(2) {z-index:3}
+.notification-row,.case-note {padding:1rem 0;border-bottom:1px solid #d7dbe9;display:flex;gap:1rem;justify-content:space-between;align-items:center}
+.case-note {display:block}
+.case-note p {white-space:pre-wrap}
+.group-edit-row {display:grid;grid-template-columns:1fr 1fr;gap:1rem;padding:1rem;border:1px solid #d7dbe9;border-radius:16px;margin:1rem 0}
+.individual-marks {margin:1rem 0}
+.score-plan {line-height:1.8}
+.daily-actions {margin-top:1rem}
+.teacher-tools-nav {display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem}
+.teacher-tools-nav button {min-height:42px}
+.work-shell button:focus-visible,.work-shell input:focus-visible {outline:3px solid #285bd8;outline-offset:3px}
+.teacher-focus input,.teacher-focus textarea,.teacher-focus select {background:#fff;color:#16233e;border-color:#b5c2d7}
+.snapshot-row {padding:1rem 0;border-bottom:1px solid #d7dbe9}
+@media(max-width:650px){.notification-row {align-items:flex-start;flex-direction:column}.group-edit-row{grid-template-columns:1fr}.result-table .table-wrap td:nth-child(2),.result-table .table-wrap th:nth-child(2){left:0;position:static}.experience-user{display:none}.teacher-tools-nav button{flex:1 1 45%}}
+
+.result-table .table-wrap td:first-child,.result-table .table-wrap th:first-child {width:65px;max-width:65px;padding-left:10px;padding-right:10px}

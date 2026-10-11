@@ -1,0 +1,1 @@
+ALTER TABLE `courses` ADD `mutation_token` text;

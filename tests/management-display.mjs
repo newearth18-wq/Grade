@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import {createElement} from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+await build({stdin:{contents:"export {DataManager} from './components/grade/data-manager';export {CourseView,StudentsView} from './components/grade/course-views';export {outstandingStatus} from './lib/work-status';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,platform:'node',format:'esm',packages:'external',jsx:'automatic',loader:{'.css':'empty'},outfile:'.sites-runtime/management-display-test.mjs'});
+const {DataManager,CourseView,StudentsView,outstandingStatus}=await import('../.sites-runtime/management-display-test.mjs');
+const c={id:'c',period_id:'p',owner_id:'t',code:'SCI01',name:'วิทยาศาสตร์',classroom:'6/1',can_edit:true,work_weight:60,mid_weight:20,final_weight:20},e={id:'e',course_id:'c',student_id:'s',name:'นักเรียนจำลอง',student_code:'00001',number:1,active:1},a={id:'a',course_id:'c',title:'งาน',max_score:10,due_at:'2026-10-01T00:00:00Z'};
+const state={user:{id:'t',role:'admin'},periods:[{id:'p',owner_id:'t',year:2569,term:2}],subjects:[],courses:[c],enrollments:[e],assignments:[a],submissions:[],files:[],students:[{id:'s',username:'00001',name:'นักเรียนจำลอง'}],extensions:[],staff:[],people:[],profiles:[],history:[]};
+let html=renderToStaticMarkup(createElement(DataManager,{state,refresh:async()=>{},edit:()=>{}}));assert(html.includes('จัดการข้อมูล'));assert(html.includes('ถังขยะ'));assert(html.includes('ล้างข้อมูลการเรียนทั้งหมด'));assert(html.includes('แก้ไข'));assert(html.includes('กู้คืนต้นทางก่อน'));
+html=renderToStaticMarkup(createElement(DataManager,{state:{...state,user:{id:'t',role:'teacher'}},refresh:async()=>{},edit:()=>{}}));assert(!html.includes('ล้างข้อมูลการเรียนทั้งหมด'));
+html=renderToStaticMarkup(createElement(CourseView,{state,course:c,edit:()=>{}}));assert(html.includes('ลบห้องเรียน'));assert(html.includes('ลบงาน'));
+html=renderToStaticMarkup(createElement(StudentsView,{state,course:c,edit:()=>{},openImport:()=>{}}));assert(html.includes('ลบจากห้องนี้'));
+html=renderToStaticMarkup(createElement(CourseView,{state:{...state,user:{id:'s',role:'student'}},course:{...c,can_edit:false},edit:()=>{}}));assert(!html.includes('ลบงาน'));assert(!html.includes('ลบห้องเรียน'));
+console.log('PASS Management entry points, contextual delete controls and student/read-only UI boundaries');
+const time=Date.parse('2026-10-08T00:00:00Z');assert.equal(outstandingStatus(state,a,'s',time),'overdue');assert.equal(outstandingStatus({...state,extensions:[{id:'x',assignment_id:'a',student_id:'s',due_at:'2026-10-10T00:00:00Z'}]},a,'s',time),'upcoming');assert.equal(outstandingStatus({...state,submissions:[{id:'sub',assignment_id:'a',student_id:'s',status:'returned'}]},a,'s',time),'returned');assert.equal(outstandingStatus({...state,submissions:[{id:'sub',assignment_id:'a',student_id:'s',status:'pending'}]},a,'s',time),'submitted');assert.equal(outstandingStatus(state,{...a,due_at:'2026-10-08T00:00:00Z'},'s',time),'upcoming');
+console.log('PASS Overdue classification honors individual extensions, returned work and deadline boundaries');
