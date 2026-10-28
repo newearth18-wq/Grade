@@ -7,7 +7,7 @@ export async function subjectPlan(u:User,b:any){
  const code=string(b.code,'รหัสวิชา',30),name=string(b.name,'ชื่อวิชา',100);
  const old=await one('SELECT * FROM subjects WHERE owner_id=? AND period_id=? AND code=? AND deleted=0',u.id,periodId,code);
  if(old)await requireLive('subject',old.id);
- if(old&&old.name!==name)fail(409,'รหัสวิชานี้มีชื่ออื่นแล้ว กรุณาเลือกวิชาเดิมหรือใช้รหัสใหม่');
+ if(old&&old.name!==name)fail(409,`รหัส ${code} ในเทอมนี้มีวิชาเดิมชื่อ “${old.name}” อยู่แล้ว กรุณากด “ใช้วิชาเดิมและเพิ่มห้อง” หรือแก้ชื่อที่จัดการข้อมูล → วิชา`);
  const id=old?.id||uid();return {id,periodId,code,name,ops:old?[]:[stmt('INSERT INTO subjects (id,period_id,owner_id,code,name,created_at) VALUES (?,?,?,?,?,?)',id,periodId,u.id,code,name,now())]};
 }
 export async function createSections(u:User,b:any){

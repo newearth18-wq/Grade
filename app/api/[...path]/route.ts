@@ -11,6 +11,7 @@ import {examRoute} from '@/lib/exam-server';
 import { extendedRoute } from '@/lib/extended-server';
 import { parseRubric,validateRubric,rubricScore } from '@/lib/rubrics';
 import { calculateGrade } from '@/lib/grades';
+import {supportValues} from '@/lib/student-support';
 export const dynamic='force-dynamic';
 
 async function assignmentAccess(u:User,id:string,write=false){await requireLive('assignment',id);const a=await one('SELECT * FROM assignments WHERE id=?',id);if(!a)fail(404,'ไม่พบงาน');const c=await ownCourse(u,a!.course_id,write);return {a:a!,c};}
@@ -103,6 +104,21 @@ async function handle(r:Request){
  }
  if(path.startsWith('enrollments/')&&method==='PATCH'){
   teacher(u);const id=path.slice(12);await requireLive('enrollment',id);const e=await one('SELECT * FROM enrollments WHERE id=?',id);if(!e)fail(404,'ไม่พบนักเรียน');const c=await openCourse(u,e!.course_id);const b=await jsonBody(r);
+  const hasSupport=['studentStatus','studentNote','statusDate'].some(k=>k in b);
+  if(hasSupport&&['mid','final','special','resetPassword'].some(k=>k in b))fail(400,'บันทึกหมายเหตุแยกจากคะแนนและรหัสผ่าน');
+  if(hasSupport){
+   let value;try{value=supportValues(b,e);}catch(err){fail(400,(err as Error).message);}
+   if(typeof b.expectedSupportUpdatedAt!=='string')fail(400,'กรุณาโหลดข้อมูลล่าสุดก่อนบันทึกหมายเหตุ');
+   const roster='name' in b||'number' in b||'active' in b;
+   const name=roster?string(b.name,'ชื่อนักเรียน',100):e!.name,num=roster?integer(b.number,'เลขที่',1,999):e!.number;
+   if(roster&&typeof b.active!=='boolean')fail(400,'สถานะการลงทะเบียนไม่ถูกต้อง');
+   const active=roster?(b.active?1:0):e!.active,stamp=now()+'-'+uid();
+   const result=await stmt('UPDATE enrollments SET name=?,number=?,active=?,student_status=?,student_note=?,status_date=?,support_updated_at=? WHERE id=? AND support_updated_at=?',name,num,active,value.status,value.note,value.date,stamp,id,b.expectedSupportUpdatedAt).run();
+   if(!result.meta.changes)fail(409,'หมายเหตุเปลี่ยนแล้ว กรุณาโหลดข้อมูลล่าสุดก่อนแก้ไข');
+   await stmt('UPDATE courses SET revision=revision+1'+(roster&& (name!==e!.name||num!==e!.number||active!==e!.active)?',published=0':'')+' WHERE id=?',c.id).run();
+   await log(u.id,c.id,'student_support',{enrollment:id,studentId:e!.student_id,before:{status:e!.student_status,note:e!.student_note,date:e!.status_date,name:e!.name,number:e!.number,active:e!.active},status:value.status,note:value.note,date:value.date,name,number:num,active});
+   return reply({ok:true});
+  }
   if(b.resetPassword){if(u.role!=='admin')fail(403,'เฉพาะผู้ดูแลระบบตั้งรหัสผ่านนักเรียนได้');const account=await one('SELECT username FROM users WHERE id=?',e!.student_id);if(!account)fail(404,'ไม่พบบัญชีนักเรียน');const password=account!.username;await database().batch([stmt('UPDATE users SET password=?,must_change=0 WHERE id=?',await hashPassword(password),e!.student_id),stmt('DELETE FROM sessions WHERE user_id=?',e!.student_id)]);await log(u.id,c.id,'reset_password',{studentId:e!.student_id});return reply({ok:true,code:password,initialPassword:password});}
   if(c.course_type==='activity'&&('mid' in b||'final' in b))fail(409,'วิชากิจกรรมไม่มีคะแนนสอบ');
   if('mid' in b||'final' in b||'special' in b){const mid='mid' in b?(b.mid===null?null:number(b.mid,'กลางภาค',0,c.mid_weight)):e!.mid;const final='final' in b?(b.final===null?null:number(b.final,'ปลายภาค',0,c.final_weight)):e!.final;const special='special' in b?(typeof b.special==='string'?b.special:''):e!.special;if(!['','ร','มส'].includes(special))fail(400,'สถานะผลการเรียนไม่ถูกต้อง');const columns:string[]=[];const values:unknown[]=[];if('mid' in b){columns.push('mid=?');values.push(mid);}if('final' in b){columns.push('final=?');values.push(final);}if('special' in b){columns.push('special=?');values.push(special);}await database().batch([stmt('UPDATE enrollments SET '+columns.join(',')+' WHERE id=?',...values,id),invalidateCourse(c.id)]);await log(u.id,c.id,'exam_scores',{enrollment:id,before:{mid:e!.mid,final:e!.final,special:e!.special},mid,final,special});}

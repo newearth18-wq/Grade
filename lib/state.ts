@@ -14,6 +14,7 @@ export async function getState(u:User){
  const submissions=await all(`SELECT s.*,g.name group_name FROM submissions s LEFT JOIN work_groups g ON g.id=s.group_id JOIN assignments a ON a.id=s.assignment_id JOIN courses c ON c.id=a.course_id WHERE ${scope} ${student?'AND s.student_id=?':''}`,...args,...(student?[u.id]:[]));
  const files=await all(`SELECT f.* FROM files f JOIN courses c ON c.id=f.course_id WHERE ${scope} ${student?'AND (f.student_id IS NULL OR f.student_id=?)':''}`,...args,...(student?[u.id]:[]));
  const extensions=await all(`SELECT x.* FROM extensions x JOIN assignments a ON a.id=x.assignment_id JOIN courses c ON c.id=a.course_id WHERE ${scope} ${student?'AND x.student_id=?':''}`,...args,...(student?[u.id]:[]));
+ if(student)for(const e of enrollments){delete e.student_status;delete e.student_note;delete e.status_date;delete e.support_updated_at;}
  if(student)for(const e of enrollments)if(!courses.find(c=>c.id===e.course_id)?.published){e.mid=null;e.final=null;e.special='';}
  const students=student?[]:u.role==='admin'?await all("SELECT id,username,name,active,must_change FROM users WHERE role='student' ORDER BY username"):await all(`SELECT DISTINCT u.id,u.username,u.name,u.active,u.must_change FROM users u JOIN enrollments e ON e.student_id=u.id JOIN courses c ON c.id=e.course_id WHERE ${scope} ORDER BY u.username`,...args);
  const staff=student?[]:await all(`SELECT cs.*,u.name,u.username,u.role FROM course_staff cs JOIN users u ON u.id=cs.user_id JOIN courses c ON c.id=cs.course_id WHERE ${scope}`,...args);

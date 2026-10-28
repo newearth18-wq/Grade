@@ -1,0 +1,9 @@
+'use client';
+import type {Row} from '@/lib/client';
+import {studentStatusLabels} from '@/lib/student-support';
+import {Textarea} from '@/components/ui/textarea';
+import {Input} from '@/components/ui/input';
+import {Button} from '@/components/ui/button';
+import type {Edit} from './editor';
+export function StudentSupportFields({enrollment:e}:{enrollment:Row}){return <fieldset className="student-support-fields"><legend>สถานะและหมายเหตุสำหรับครู</legend><label>สถานะนักเรียน<select name="studentStatus" defaultValue={e.student_status||'normal'}>{Object.entries(studentStatusLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label>วันที่เริ่มสถานะ (ไม่บังคับ)<Input name="statusDate" type="date" defaultValue={e.status_date||''}/></label><label>หมายเหตุ (ไม่เกิน 2,000 ตัวอักษร)<Textarea name="studentNote" rows={4} maxLength={2000} defaultValue={e.student_note||''} placeholder="เช่น ย้ายโรงเรียนตั้งแต่วันที่… / ขาดเรียนต่อเนื่อง รอติดต่อผู้ปกครอง"/></label><p className="muted">บันทึกเฉพาะวิชา ห้อง และเทอมนี้ ครูที่มีสิทธิ์ดูรายวิชาเท่านั้นที่เห็น ไม่แสดงให้นักเรียนและไม่ส่งไป SGS การเลือกสถานะไม่เปลี่ยนคะแนน ร / มส หรือพักการลงทะเบียนอัตโนมัติ</p></fieldset>;}
+export function StudentSupportSummary({enrollment:e,course,edit}:{enrollment:Row;course:Row;edit?:(e:Edit)=>void}){const status=e.student_status||'normal';return <div className="student-support-summary"><span className={`badge ${status==='normal'?'green':'amber'}`}>{studentStatusLabels[status]||'ปกติ'}</span>{e.status_date&&<small className="cell-sub">ตั้งแต่ {e.status_date.split('-').reverse().join('/')}</small>}{e.student_note&&<p className="student-support-note">{e.student_note}</p>}{edit&&<Button variant="ghost" size="sm" disabled={!!course.archived||!course.can_edit} onClick={()=>edit({kind:'enrollment',item:e,course})}>{e.student_note?'แก้ไขหมายเหตุ':'เพิ่มหมายเหตุ'}</Button>}</div>;}
