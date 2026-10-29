@@ -1,6 +1,7 @@
 import { all, one, stmt, database, bucket, HttpError, fail, uid, now, string, number, integer, jsonBody, reply, ensureSameOrigin, log,requireLive,isTrashed } from '@/lib/server';
 import { currentUser, requireUser, teacher, ownCourse, hashPassword, matches, passwordValid, session, cookie, digest, upgradeStudentInitialPassword, type User } from '@/lib/auth';
 import {createSections,subjectRoute} from '@/lib/subjects-server';
+import {attendanceQrRoute} from '@/lib/attendance-qr-server';
 import {teacherRoute} from '@/lib/teacher-server';
 import {snapshotsRoute,snapshotCourse} from '@/lib/snapshots-server';
 import {publicationCheck} from '@/lib/teacher-logic';
@@ -69,6 +70,7 @@ async function handle(r:Request){
   const hash=await hashPassword(passwordValid(b.password));await database().batch([stmt('UPDATE users SET password=?,must_change=0 WHERE id=?',hash,u.id),stmt('DELETE FROM sessions WHERE user_id=?',u.id)]);return reply({ok:true},200,{'Set-Cookie':await session(r,u.id)});
  }
  if(u.must_change)fail(403,'กรุณาเปลี่ยนรหัสผ่านชั่วคราวก่อนใช้งาน');
+ const qrResponse=await attendanceQrRoute(r,u,path,method);if(qrResponse)return qrResponse;
  const teacherResponse=await teacherRoute(r,u,path,method);if(teacherResponse)return teacherResponse;
  const snapshotResponse=await snapshotsRoute(r,u,path,method);if(snapshotResponse)return snapshotResponse;
  const groupResponse=await groupRoute(r,u,path,method);if(groupResponse)return groupResponse;

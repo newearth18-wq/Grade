@@ -22,4 +22,5 @@ for(const [title,asset] of [['โปสเตอร์โลกแห่งส�
  const task=await call('assignments',{courseId:galleryRoom.id,title,description:'ข้อมูลจำลองสำหรับทดสอบการเปิดฟอง อ่านโจทย์ และดูตัวอย่างงานของครู โดยไม่เปลี่ยนข้อมูลโรงเรียน',maxScore:10,workPhase:'before',dueAt:'2027-12-01T09:00:00+07:00',rubric:[]});
  const form=new FormData();form.set('assignmentId',task.id);form.append('files',new Blob([await readFile('public/experience/'+asset)],{type:'image/webp'}),asset);await call('samples',form);
 }
+const qrRoom=(await call('state')).courses.find(c=>c.code==='ค30101'&&c.classroom==='6/1');await call('attendance',{courseId:qrRoom.id,date:'2026-10-29',title:'คาบฝึกปฏิบัติ QR',hours:1});
 await fetch('http://127.0.0.1:8792/');console.log('Disposable bubble/room tree preview ready: http://127.0.0.1:8792/');console.log('Test teacher exam_teacher / Exam-Preview-Teacher-1234; student EXAM001 / EXAM001; teacher unlock Teacher-2468');process.on('SIGINT',async()=>{await mf.dispose();process.exit(0);});await new Promise(()=>{});

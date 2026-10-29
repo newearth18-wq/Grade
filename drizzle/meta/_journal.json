@@ -99,6 +99,13 @@
       "when": 1793149200000,
       "tag": "0013_student_support",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1793235600000,
+      "tag": "0014_attendance_qr",
+      "breakpoints": true
     }
   ]
 }
