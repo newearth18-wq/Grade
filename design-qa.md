@@ -20,7 +20,7 @@ Grade retains its own branding, Thai classroom controls, banyan model and score-
 
 - TypeScript and production build.
 - Existing tests for outstanding-work visibility, teacher-only sample selection, enrollment/term isolation and independent per-room tree scores.
-- Geometry tests project actual tree vertices at desktop, narrow desktop and mobile camera settings through all growth stages. Seedling anatomy, mature roots, reusable geometry and three tree draw calls remain covered.
+- Geometry tests project actual tree vertices at desktop, narrow desktop and mobile camera settings through all growth stages. Mobile intentionally crops canopy edges, as in the reference, while keeping vertical growth inside the scene; wider orbits move secondary bubbles beyond the screen edges rather than crowding them. Seedling anatomy, mature roots, reusable geometry and three tree draw calls remain covered.
 - Disposable local browser fixture: open a selected bubble; return; switch subjects; view both task samples; move to the next task; enter the correct classroom follow-up page; open a room with no pending tasks.
 - Responsive gallery inspected at 1280 × 720 and 390 × 844. Temporary browser viewport settings are reset after verification.
 - No production student records were created or changed during QA.
