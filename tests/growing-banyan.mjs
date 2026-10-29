@@ -3,15 +3,15 @@ import {build} from 'esbuild';
 import * as T from 'three';
 await build({entryPoints:['lib/models/growing-banyan.ts'],outfile:'node_modules/.cache/growing-banyan.mjs',bundle:true,platform:'node',format:'esm',packages:'external'});
 const {createGrowingBanyanTree}=await import('../node_modules/.cache/growing-banyan.mjs');
-for(const [width,height,worldScale,detail] of [[1200,400,1.1,'full'],[350,370,.88,'compact']]){
- const living=createGrowingBanyanTree({detail}),world=new T.Group();world.position.y=-1.45;world.scale.setScalar(worldScale);living.tree.position.y=.14;world.add(living.tree);
- const camera=new T.OrthographicCamera(-4.6*width/height,4.6*width/height,4.6,-4.6,.1,60);camera.position.set(0,2.2,12);camera.lookAt(0,1.3,0);camera.updateMatrixWorld();
+for(const [width,height,worldScale,detail] of [[1280,720,1.12,'full'],[390,844,1,'compact'],[600,720,1.12,'full']]){
+ const living=createGrowingBanyanTree({detail}),world=new T.Group();world.position.y=-.45;world.scale.setScalar(worldScale);living.tree.position.y=.46;world.add(living.tree);
+ const camera=new T.PerspectiveCamera(width<600?49:43,width/height,.1,80);camera.position.set(0,2.3,width<600?22:width/height<1.3?18:14);camera.lookAt(0,1.1,0);camera.updateMatrixWorld();
  const seed=structuredClone(living.tree.userData.growth);assert.equal(seed.leafCount,2);assert.equal(seed.branchCount,0);assert.equal(seed.rootCount,0);assert.ok(seed.stemRadius<.03);
  const stem= living.tree.getObjectByName('Growing stem and branches'),firstGeometry=stem.geometry;
  let prior=seed;
  for(const ratio of [0,.1,.25,.45,.7,.9,1]){
   living.update(ratio);const state=living.tree.userData.growth;assert.ok(state.height>=prior.height);assert.ok(state.stemRadius>=prior.stemRadius);assert.ok(state.leafCount>=prior.leafCount);assert.equal(living.tree.scale.x,1);assert.equal(living.tree.scale.y,1);assert.equal(stem.geometry,firstGeometry);assert.equal(state.rootCount===0,ratio<=.45);prior={...state};
-  for(const angle of [0,.7,1.4,2.8]){world.rotation.y=angle;world.updateMatrixWorld(true);const box=new T.Box3().setFromObject(living.tree);for(const x of [box.min.x,box.max.x])for(const y of [box.min.y,box.max.y])for(const z of [box.min.z,box.max.z]){const p=new T.Vector3(x,y,z).project(camera);assert.ok(Math.abs(p.x)<1&&Math.abs(p.y)<1,`clipped ${detail} at ${ratio}: ${p.x},${p.y}`);}}
+  for(const angle of [0,.7,1.4,2.8]){world.rotation.y=angle;world.updateMatrixWorld(true);const point=new T.Vector3(),instance=new T.Matrix4(),matrix=new T.Matrix4();living.tree.traverse(mesh=>{if(!(mesh instanceof T.Mesh))return;const positions=mesh.geometry.attributes.position;for(let i=0;i<(mesh instanceof T.InstancedMesh?mesh.count:1);i++){if(mesh instanceof T.InstancedMesh){mesh.getMatrixAt(i,instance);matrix.multiplyMatrices(mesh.matrixWorld,instance);}else matrix.copy(mesh.matrixWorld);for(let v=0;v<positions.count;v++){point.fromBufferAttribute(positions,v).applyMatrix4(matrix).project(camera);assert.ok(Math.abs(point.x)<1&&Math.abs(point.y)<1,`clipped ${detail} at ${ratio}: ${point.x},${point.y}`);}}});}
  }
  assert.equal(prior.branchCount,7);assert.equal(prior.rootCount,21);assert.ok(prior.stemRadius>seed.stemRadius*10);assert.equal(prior.leafCount,detail==='compact'?1200:2400);
  let calls=0;living.tree.traverse(o=>{if(o instanceof T.Mesh)calls++;if(o.geometry?.attributes.position)for(const n of o.geometry.attributes.position.array)assert.ok(Number.isFinite(n));});assert.equal(calls,3);

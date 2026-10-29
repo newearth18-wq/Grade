@@ -59,7 +59,7 @@ export function createGrowingBanyanTree({detail='full',seed=1987}:{detail?:'full
    buffer.needsUpdate=true;geometry.computeVertexNormals();
   }
   reshape(wood,woodGeometry);reshape(roots,rootGeometry);rootGeometry.getAttribute('position').needsUpdate=true;
-  const seedLeaves=2+Math.floor(18*Math.min(1,g/.3)),canopyAge=Math.max(0,(g-.3)/.7),count=g<.3?seedLeaves:20+Math.floor((maximum-20)*Math.pow(canopyAge,1.65)),bloom=phase(g,.62,.96);
+  const seedLeaves=2+Math.floor(18*Math.min(1,g/.3)),canopyAge=Math.max(0,(g-.3)/.7),count=g<.3?seedLeaves:20+Math.floor((maximum-20)*Math.pow(canopyAge,1.65));
   for(let i=0;i<count;i++){
    const s=samples[i];
    if(i<20){const pair=Math.floor(i/2),a=pair*2.2+(i%2)*Math.PI,unfold=1-phase(g,.34,.56),size=(.24+Math.min(g,.3)*.12)*unfold;
@@ -68,9 +68,9 @@ export function createGrowingBanyanTree({detail='full',seed=1987}:{detail?:'full
    }else{
     const b=branches[s.branch%7],age=phase(g,b.start,.8+(s.branch%7)*.02),spread=.20+phase(g,.32,1)*.88;
     const centre=s.branch===7?new T.Vector3(0,height,0):new T.Vector3(Math.cos(b.angle)*b.reach*age,height*b.attach+b.rise*age,Math.sin(b.angle)*b.reach*age);
-    dummy.position.set(centre.x+s.dx*spread,centre.y+s.dy*spread*.72,centre.z+s.dz*spread*.8);dummy.scale.set(s.size*1.6,s.size*.48,s.size);dummy.rotation.set((s.shade-.5)*1.1,s.rotation,(s.shade-.5)*.8);
+    dummy.position.set(centre.x+s.dx*spread,centre.y+s.dy*spread*.72,centre.z+s.dz*spread*.8);dummy.scale.set(s.size*1.25,s.size*.09,s.size*.65);dummy.rotation.set((s.shade-.5)*2.8,s.rotation,(s.shade-.5)*2.4);
    }
-   jade.setHSL(.23+s.shade*.055,.52,.31+s.shade*.12);rose.setHSL(.87+s.shade*.065,.58,.40+s.shade*.10);color.copy(jade).lerp(rose,i<20?0:bloom);dummy.updateMatrix();foliage.setMatrixAt(i,dummy.matrix);foliage.setColorAt(i,color);
+   jade.setHSL(.23+s.shade*.055,.60,.36+s.shade*.12);rose.setHSL(.88+s.shade*.065,.74,.49+s.shade*.13);color.copy(i<20?jade:rose);dummy.updateMatrix();foliage.setMatrixAt(i,dummy.matrix);foliage.setColorAt(i,color);
   }
   foliage.count=count;foliage.boundingBox=null;foliage.boundingSphere=null;foliage.instanceMatrix.needsUpdate=true;if(foliage.instanceColor)foliage.instanceColor.needsUpdate=true;
   tree.userData.growth={ratio:g,height,stemRadius,leafCount:count,branchCount:branches.filter(b=>g>b.start).length,rootCount:roots.filter(p=>p.shape(g,height).thickness>0).length};
