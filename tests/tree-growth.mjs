@@ -17,3 +17,11 @@ const big={...state,assignments:[{...state.assignments[0],max_score:60}],submiss
 for(const [points,stage,next] of [[0,0,10],[9,0,10],[10,1,25],[25,2,45],[45,3,70],[70,4,90],[90,5,100]]){const growth=treeGrowth({...big,submissions:[{...big.submissions[0],score:points}]},[{...c,work_weight:100,before_work_weight:50,mid_weight:0,final_weight:0}]);assert.equal(growth.stage,stage);assert.equal(growth.next,next);}
 assert.equal(treeGrowth({...big,submissions:[{...big.submissions[0],score:999}]},[c]).ratio,1);
 console.log('PASS tree growth: actual points, hidden exam privacy, ungraded work, own account, active enrollment, subject/term isolation, teacher average, legacy grades, full growth and bounds');
+
+const rooms=[{...c,id:'science-a',subject_id:'science',classroom:'6/1',period_id:'term1',published:1},{...c,id:'science-b',subject_id:'science',classroom:'6/2',period_id:'term1',published:1},{...c,id:'math-a',subject_id:'math',classroom:'6/1',period_id:'term1',published:1},{...c,id:'science-next',subject_id:'science-next',classroom:'6/1',period_id:'term2',published:1}];
+const scoped={user:{id:'t',role:'teacher'},enrollments:rooms.map(room=>({course_id:room.id,student_id:'s1',active:1,mid:0,final:0})),assignments:rooms.map(room=>({id:room.id+'-task',course_id:room.id,max_score:30,work_phase:'before'})),submissions:rooms.map((room,i)=>({assignment_id:room.id+'-task',student_id:'s1',status:'graded',score:[10,25,18,3][i]}))};
+assert.deepEqual(rooms.map(room=>treeGrowth(scoped,[room]).percent),[10,25,18,3]);
+const changed={...scoped,submissions:scoped.submissions.map(mark=>mark.assignment_id==='science-b-task'?{...mark,score:30}:mark)};
+assert.deepEqual(rooms.map(room=>treeGrowth(changed,[room]).percent),[10,30,18,3]);
+assert.deepEqual(rooms.map(room=>treeGrowth({...scoped,user:{id:'someone-else',role:'student'}},[room]).percent),[0,0,0,0]);
+console.log('PASS independent trees for sibling rooms, different subjects and terms; changing one room leaves all other trees unchanged');
