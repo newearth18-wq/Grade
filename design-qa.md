@@ -53,3 +53,7 @@ The user selected the KRUNIK SUPAKIT Google Apps Script learning-media portal as
 Temporary screenshots are stored outside this repository in outputs/Grade-v27-*.png. The existing large-client-chunk warning remains; no measured FPS guarantee is claimed.
 
 30 October follow-up: read the user-owned Index.html through the school-account Apps Script editor. It uses Three.js OrbitControls with damping, no pan, bounded polar angles and zoom. Grade now supports vertical pointer drags, up/down buttons, keyboard arrows and reset alongside its unrestricted horizontal rotation. Verified actual vertical drag changes the projected view without opening a bubble. Mobile header uses content-sized grid rows so long subject names do not overlap the gallery panel. No source-project code or settings were changed.
+
+Palette restoration, 30 October: at the user's request, restored the previous blue/lavender/pink pastel world background, natural brown trunk/root colors, and original indigo gallery sky. Course-name text and orbit controls use purple ink for contrast on the lighter sky; image-backed names retain a light text treatment without backgrounds. Scene geometry, vertical/horizontal controls, search, growth calculations and classroom behavior are unchanged.
+
+Bubble-size follow-up: reduce projected bubble radius from 1.15 to 0.98 (about 15% smaller diameter), including its matching DOM target and labels. Fallback bubbles reduce from 150px to 128px. Orbit paths and camera controls remain unchanged.

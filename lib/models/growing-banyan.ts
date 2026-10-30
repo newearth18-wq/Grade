@@ -9,8 +9,8 @@ type Limb={centres:T.Vector3[];offsets:T.Vector3[];shape:(growth:number,height:n
 export function createGrowingBanyanTree({detail='full',seed=1987}:{detail?:'full'|'compact';seed?:number}={}){
  const tree=new T.Group();tree.name='Growing Grade Banyan';
  let state=seed;const random=()=>{state=(state*1664525+1013904223)>>>0;return state/4294967296;};
- const bark=new T.MeshStandardMaterial({color:0x7888b1,roughness:.85});
- const rootBark=new T.MeshStandardMaterial({color:0x8b80ad,roughness:.9});
+ const bark=new T.MeshStandardMaterial({color:0x8c7355,roughness:1});
+ const rootBark=new T.MeshStandardMaterial({color:0x9c856b,roughness:1});
  const leaves=new T.MeshStandardMaterial({color:0xffffff,roughness:.85});
  const wood:Limb[]=[],roots:Limb[]=[],branches:{angle:number;start:number;attach:number;reach:number;rise:number}[]=[];
  function limb(points:number[][],radii:number[],shape:Limb['shape'],target:Limb[],segments=16,sides=7){

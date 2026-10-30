@@ -59,7 +59,7 @@
 .explore-shell .orbit-bubble.bubble-opening{animation:none}
 .explore-shell .scene-loading{color:#fff7dc}
 .explore-shell .scene-fallback .orbit-subjects{padding:230px 24px 220px;gap:45px}
-.explore-shell .scene-fallback .orbit-bubble{width:150px;height:150px;visibility:visible!important}
+.explore-shell .scene-fallback .orbit-bubble{width:128px;height:128px;visibility:visible!important}
 
 /* The inside of a bubble is a separate, full screen artwork space. */
 .bubble-gallery[data-slot=dialog-content]{position:fixed!important;inset:0!important;translate:none!important;transform:none!important;width:100vw!important;max-width:none!important;height:100dvh!important;max-height:none!important;padding:0!important;border:0!important;border-radius:0!important;display:flex;flex-direction:column;gap:0;overflow:hidden;background:#1b1b46 url('/experience/gallery-sky.webp') center/cover no-repeat!important;color:#fff7dc!important;box-shadow:none!important;font-family:inherit;animation:gallery-arrive .35s ease both!important}

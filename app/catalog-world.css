@@ -1,7 +1,7 @@
 /* Classroom composition adapted from the user's KRUNIK media-world reference. */
-.explore-shell .experience-atmosphere{background:linear-gradient(180deg,#67319edb 0%,#a15abbbf 40%,#dc8fb4c4 67%,#ffa264ed 100%),#ad6cbd url('/experience/classroom-sky.webp') center/cover no-repeat}
+.explore-shell .experience-atmosphere{background:linear-gradient(125deg,#637ebcce,#b4a3d3a6 40%,#edb4cbd1 72%,#f9d5a9b3),#bcb2df url('/experience/classroom-sky.webp') center/cover no-repeat}
 .explore-shell .experience-topbar{height:88px;padding:24px 28px}
-.explore-shell .experience-brand{gap:12px}.explore-shell .experience-brand>svg{box-sizing:content-box;padding:11px;background:#fff9e9;color:#60347b;border-radius:50%;width:22px;height:22px}.explore-shell .experience-brand>span{font-size:23px;letter-spacing:-.5px}
+.explore-shell .experience-brand{gap:12px;color:#432d59!important}.explore-shell .experience-brand>svg{box-sizing:content-box;padding:11px;background:#fff9e9;color:#60347b;border-radius:50%;width:22px;height:22px}.explore-shell .experience-brand>span{font-size:23px;letter-spacing:-.5px}
 .explore-shell .experience-tools button{background:#fff8e9e8;color:#573371;border:0;height:40px;padding-inline:15px}
 .explore-shell .explore-heading .heading-actions{inset:86px 28px auto auto;gap:8px}
 .explore-shell .explore-heading .heading-actions button{height:35px;font-size:12px;padding-inline:14px}.explore-shell .explore-heading .heading-actions button:first-child{width:35px;padding:8px}
@@ -11,33 +11,32 @@
 .explore-shell .island-stage{touch-action:none}
 .explore-shell .world-heading{inset:auto auto 86px 50%;transform:translateX(-50%);z-index:11;white-space:nowrap}
 .explore-shell .world-heading button{background:#fff8e9;color:#573371;font-size:13px;height:43px;padding-inline:23px;box-shadow:0 8px 24px #64326412}
-.explore-shell .island-focused-label{inset:108px 28% auto;margin:0;text-shadow:0 1px 5px #4d256a55}
-.explore-shell .island-focused-label h3{font-size:22px;font-weight:500;line-height:1.45;color:#fff8eb}
-.explore-shell .island-focused-label>span{font-size:12px;margin-top:5px;color:#fff3e7}
-.explore-shell .world-pagination{bottom:36px;gap:13px}.explore-shell .world-pagination button{width:31px;height:31px;border-color:#fff8eb77;background:#fff8eb17}.explore-shell .world-pagination span{font-size:12px;min-width:85px}
+.explore-shell .island-focused-label{inset:108px 28% auto;margin:0;text-shadow:0 1px 4px #ffffff66}
+.explore-shell .island-focused-label h3{font-size:22px;font-weight:500;line-height:1.45;color:#432d59}
+.explore-shell .island-focused-label>span{font-size:12px;margin-top:5px;color:#5e4e75}
+.explore-shell .world-pagination{bottom:36px;gap:13px}.explore-shell .world-pagination button{width:31px;height:31px;border-color:#72559566;background:#ffffff33;color:#52366d}.explore-shell .world-pagination span{font-size:12px;min-width:85px;color:#52366d}
 .tree-info-dock{top:auto;bottom:22px;left:28px;width:285px;max-width:calc(100% - 56px)}
 .tree-info-dock>summary{background:#fff8e9da;border:0;font-size:12px;padding:8px 13px;color:#593b6c}
 .tree-info-dock .tree-growth-summary{position:absolute;bottom:calc(100% + 12px);left:0;margin:0;background:#fffaf0fa;color:#43265c;border-color:#fff9e9;box-shadow:0 15px 35px #48225a22}
 .explore-shell .explore-more{top:26px;right:290px;bottom:auto;max-width:none;padding:10px 15px;background:#fff8e9e8;color:#573371;border-radius:25px;font-size:12px;gap:6px;line-height:20px}
 .explore-shell .explore-more svg{width:15px;height:15px}
 .explore-shell .scene-controls{left:auto;right:28px;bottom:26px;gap:6px;padding:0;background:none;border:0;max-width:none}
-.explore-shell .scene-controls button{width:33px;height:33px;border:1px solid #fff9e987;background:#fff8e91c;color:#fff9e9;box-shadow:none;display:grid;place-items:center}
+.explore-shell .scene-controls button{width:33px;height:33px;border:1px solid #72559555;background:#ffffff38;color:#52366d;box-shadow:none;display:grid;place-items:center}
 .explore-shell .scene-controls button:hover{background:#fff8e94a}.explore-shell .scene-controls button:disabled{opacity:.4;cursor:default}
-.scene-interaction-hint{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);z-index:6;color:#fff9e9;font-size:10px;white-space:nowrap;text-align:center;pointer-events:none}
+.scene-interaction-hint{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);z-index:6;color:#52366d;font-size:10px;white-space:nowrap;text-align:center;pointer-events:none}
 .scene-help-panel{position:absolute;bottom:72px;right:28px;z-index:14;max-width:340px;padding:23px;border-radius:22px;background:#fffaf0f7;color:#4b2b63;box-shadow:0 14px 50px #49235c33;cursor:auto;line-height:1.8;font-size:14px}
 .scene-help-panel strong{font-size:19px;line-height:1.5}.scene-help-panel p{margin-top:12px}.scene-help-panel button{margin-top:17px;border:0;border-radius:24px;background:#633883;color:#fff9e9;padding:9px 23px;width:100%;cursor:pointer}
 .explore-shell .orbit-bubble.task-bubble{background:radial-gradient(circle at 27% 20%,#fff9 0,#fff2 18%,#d2b3df09 57%,#fff2 88%,#fff8 100%);border-color:#ffecc780;box-shadow:inset 2px 3px 7px #fff7,inset -5px -8px 17px #74488229,0 0 0 2px #fff1}
-.explore-shell .orbit-bubble>.bubble-subject-name{background:transparent!important;color:#fff9eb;font-size:18px;font-weight:500;line-height:1.45;text-shadow:0 1px 4px #432263c9,0 0 8px #43226366;bottom:14%;padding:0 4px}
-.explore-shell .bubble-art>span,.explore-shell .bubble-art svg{color:#fff8eb!important;text-shadow:0 1px 4px #64347a55}
+.explore-shell .orbit-bubble>.bubble-subject-name{background:transparent!important;color:#432d59;font-size:18px;font-weight:500;line-height:1.45;text-shadow:0 1px 3px #ffffffa6;bottom:14%;padding:0 4px}
+.explore-shell .bubble-has-art>.bubble-subject-name{color:#fff8eb;text-shadow:0 1px 4px #29183ad9,0 0 10px #29183a99}
+.explore-shell .bubble-art>span,.explore-shell .bubble-art svg{color:#52366d!important;text-shadow:0 1px 3px #ffffff77}
 .explore-shell .orbit-bubble:not(.bubble-has-art)>.bubble-art{padding-top:26px;gap:7px}.explore-shell .orbit-bubble:not(.bubble-has-art) .bubble-art svg{width:31px;height:31px}
 .explore-shell .orbit-bubble:not(.bubble-has-art) .bubble-art>span{font-size:17px}
 .explore-shell .orbit-bubble[aria-pressed=true]>.bubble-caption{display:none}
 .subject-picker[data-slot=dialog-content]{background:#fff8edf7!important;color:#4d2f65;border:1px solid #fff8eb;border-radius:24px!important}.subject-picker-grid button{background:#f5ebfa!important;color:#4d2f65!important;border-color:#e4d0ef!important}.subject-picker-grid button[aria-pressed=true]{background:#e7d7f8!important;border-color:#ac8cc9!important}
 
 /* Each subject opens into a calm, three-dimensional constellation of work. */
-.bubble-gallery{--gallery-glow:#556fe7a6;--gallery-top:#19103d;--gallery-bottom:#28256e}
-.gallery-theme-science{--gallery-glow:#2b999da6;--gallery-top:#0f2441;--gallery-bottom:#203677}.gallery-theme-art{--gallery-glow:#b254a78c;--gallery-top:#301342;--gallery-bottom:#35267d}.gallery-theme-language{--gallery-glow:#754fae9c;--gallery-top:#231447;--gallery-bottom:#3e256d}
-.bubble-gallery[data-slot=dialog-content]{background:radial-gradient(ellipse at 23% 85%,var(--gallery-glow),transparent 60%),radial-gradient(ellipse at 70% 5%,#28a3b746,transparent 43%),linear-gradient(155deg,var(--gallery-top),var(--gallery-bottom))!important}
+.bubble-gallery[data-slot=dialog-content]{background:#1b1b46 url('/experience/gallery-sky.webp') center/cover no-repeat!important}
 .gallery-constellation{position:absolute;inset:0;z-index:0;pointer-events:none}.gallery-constellation canvas{display:block;width:100%;height:100%}
 .gallery-topbar{height:144px;min-height:144px;padding:25px 28px;align-items:flex-start;flex-shrink:0}
 .gallery-brand{display:flex;align-items:center;gap:10px;color:#fff8eb}.gallery-brand>svg{box-sizing:content-box;padding:10px;background:#fff8eb;color:#60347b;border-radius:50%}.gallery-brand>strong{display:grid;gap:3px;font-size:18px;line-height:1.2;letter-spacing:.3px}.gallery-brand small{font-size:8px;letter-spacing:2.3px;font-weight:500}
