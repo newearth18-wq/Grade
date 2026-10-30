@@ -1,10 +1,11 @@
+import {driveBackupActive} from '@/lib/drive-backup-server';
 import {env} from 'cloudflare:workers';
 import {all,one,reply,HttpError} from '@/lib/server';
 import {snapshotCourse} from '@/lib/snapshots-server';
 import {getState} from '@/lib/state';
 import type {User} from '@/lib/auth';
 
-const tools=[{name:'daily_classroom_backup',description:'Create complete daily recovery snapshots, including uploaded files, for enabled classroom owners. Existing snapshots for today are reused.',inputSchema:{type:'object',properties:{},additionalProperties:false}},{name:'classroom_backup_status',description:'Read aggregate backup completion and failure counts without exposing student records or files.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true}}];
+const tools=[{name:'daily_classroom_backup',description:'Create daily Cloudflare snapshots for enabled owners. Owners with verified Drive connections are handled by their Google server trigger and are skipped here. Existing daily jobs are reused.',inputSchema:{type:'object',properties:{},additionalProperties:false}},{name:'classroom_backup_status',description:'Read aggregate backup completion and failure counts without exposing student records or files.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true}}];
 export async function POST(r:Request){
  let id:any=null;
  try {
@@ -22,13 +23,16 @@ export async function POST(r:Request){
   if(body.params?.arguments&&Object.keys(body.params.arguments).length)throw new HttpError(400,'This tool accepts no arguments');
   if(body.params?.name==='daily_classroom_backup'){
    const owners=await all<User>("SELECT id,username,name,role,must_change,active FROM users WHERE active=1 AND role IN ('admin','teacher')");
-   let completed=0;const errors:string[]=[];
-   for(const u of owners){if((await one('SELECT value FROM settings WHERE key=?','backup-auto:'+u.id))?.value==='0')continue;const state=await getState(u);
+   let completed=0,driveManaged=0;const errors:string[]=[];
+   for(const u of owners){if((await one('SELECT value FROM settings WHERE key=?','backup-auto:'+u.id))?.value==='0')continue;if(await driveBackupActive(u.id)){driveManaged++;continue;}const state=await getState(u);
     for(const c of state.courses.filter(c=>c.owner_id===u.id&&!c.archived)){try{await snapshotCourse(u,c.id,'daily',true);completed++;}catch(e){errors.push((e as Error).message);}}
    }
-   return result({content:[{type:'text',text:JSON.stringify({completed,failed:errors.length,errors})}],isError:errors.length>0});
+   return result({content:[{type:'text',text:JSON.stringify({completed,driveManaged,failed:errors.length,errors})}],isError:errors.length>0});
   }
-  if(body.params?.name==='classroom_backup_status')return result({content:[{type:'text',text:JSON.stringify(await all("SELECT status,COUNT(*) AS count,MAX(created_at) AS latest FROM backup_snapshots WHERE kind='daily' AND substr(datetime(created_at,'+7 hours'),1,10)=? GROUP BY status",new Date(Date.now()+7*3600000).toISOString().slice(0,10)))}]});
+  if(body.params?.name==='classroom_backup_status'){
+   const day=new Date(Date.now()+7*3600000).toISOString().slice(0,10);
+   return result({content:[{type:'text',text:JSON.stringify({cloudflare:await all("SELECT status,COUNT(*) AS count,MAX(created_at) AS latest FROM backup_snapshots WHERE kind='daily' AND substr(datetime(created_at,'+7 hours'),1,10)=? GROUP BY status",day),drive:await all("SELECT status,COUNT(*) AS count,MAX(completed_at) AS latestComplete FROM drive_backup_jobs WHERE substr(datetime(created_at,'+7 hours'),1,10)=? GROUP BY status",day),driveLatest:await one("SELECT MAX(completed_at) AS completedAt FROM drive_backup_jobs WHERE status='complete'")})}]});
+  }
   throw new HttpError(404,'Unknown tool');
  }catch(e){return reply({jsonrpc:'2.0',id,result:{content:[{type:'text',text:(e as Error).message}],isError:true}});}
 }

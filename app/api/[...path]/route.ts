@@ -1,3 +1,4 @@
+import {driveRemoteRoute,driveSettingsRoute} from '@/lib/drive-backup-server';
 import { all, one, stmt, database, bucket, HttpError, fail, uid, now, string, number, integer, jsonBody, reply, ensureSameOrigin, log,requireLive,isTrashed } from '@/lib/server';
 import { currentUser, requireUser, teacher, ownCourse, hashPassword, matches, passwordValid, session, cookie, digest, upgradeStudentInitialPassword, type User } from '@/lib/auth';
 import {createSections,subjectRoute} from '@/lib/subjects-server';
@@ -43,6 +44,7 @@ function uploadReceipt(u:User,a:any,requestId:string,id:string,revision:number,s
 async function handle(r:Request){
  const path=new URL(r.url).pathname.replace(/^\/api\//,'').replace(/\/$/,'');const method=r.method;
  if(method!=='GET')ensureSameOrigin(r);
+ const remoteBackup=await driveRemoteRoute(r,path,method);if(remoteBackup)return remoteBackup;
  if(path==='auth'&&method==='GET'){const user=await currentUser(r);const setup=!(await one('SELECT value FROM settings WHERE key=?','bootstrap'));return reply({user,setup});}
  if(path==='setup'&&method==='POST'){
   const b=await jsonBody(r);const name=string(b.name,'ชื่อครู',100);const username=string(b.username,'ชื่อผู้ใช้',40);if(!/^[a-zA-Z0-9_.-]{3,40}$/.test(username))fail(400,'ชื่อผู้ใช้ต้องมี 3–40 ตัวอักษรอังกฤษ ตัวเลข หรือ . _ -');
@@ -64,6 +66,7 @@ async function handle(r:Request){
   await stmt('DELETE FROM login_limits WHERE key=?',key).run();return reply({ok:true},200,{'Set-Cookie':await session(r,user!.id)});
  }
  const u=await requireUser(r);
+ const driveSettings=await driveSettingsRoute(r,u,path,method);if(driveSettings)return driveSettings;
  if(path==='logout'&&method==='POST'){const token=r.headers.get('cookie')?.match(/(?:^|;\s*)grade_session=([^;]+)/)?.[1];if(token)await stmt('DELETE FROM sessions WHERE token=?',await digest(token)).run();return reply({ok:true},200,{'Set-Cookie':cookie(r,'',0)});}
  if(path==='password'&&method==='POST'){
   const b=await jsonBody(r);const row=await one('SELECT password FROM users WHERE id=?',u.id);if(typeof b.oldPassword!=='string'||!await matches(b.oldPassword,row!.password))fail(403,'รหัสผ่านเดิมไม่ถูกต้อง');
