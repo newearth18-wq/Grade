@@ -9,8 +9,8 @@ type Limb={centres:T.Vector3[];offsets:T.Vector3[];shape:(growth:number,height:n
 export function createGrowingBanyanTree({detail='full',seed=1987}:{detail?:'full'|'compact';seed?:number}={}){
  const tree=new T.Group();tree.name='Growing Grade Banyan';
  let state=seed;const random=()=>{state=(state*1664525+1013904223)>>>0;return state/4294967296;};
- const bark=new T.MeshStandardMaterial({color:0x8c7355,roughness:1});
- const rootBark=new T.MeshStandardMaterial({color:0x9c856b,roughness:1});
+ const bark=new T.MeshStandardMaterial({color:0x7888b1,roughness:.85});
+ const rootBark=new T.MeshStandardMaterial({color:0x8b80ad,roughness:.9});
  const leaves=new T.MeshStandardMaterial({color:0xffffff,roughness:.85});
  const wood:Limb[]=[],roots:Limb[]=[],branches:{angle:number;start:number;attach:number;reach:number;rise:number}[]=[];
  function limb(points:number[][],radii:number[],shape:Limb['shape'],target:Limb[],segments=16,sides=7){
@@ -24,7 +24,9 @@ export function createGrowingBanyanTree({detail='full',seed=1987}:{detail?:'full
   const geometry=new T.BufferGeometry();geometry.setAttribute('position',new T.Float32BufferAttribute(positions,3));geometry.setIndex(indices);target.push({centres,offsets,shape,geometry,start:0});
  }
  // The seedling has one slender stem. Its own centreline extends and its radius thickens.
- limb([[0,0,0],[-.07,.25,.02],[.045,.6,0],[0,1,0]],[.3,.23,.11,.018],(g,h)=>({anchor:new T.Vector3(),length:new T.Vector3(.15+g*.85,h, .15+g*.85),thickness:(.022+.278*Math.pow(g,1.7))/.3}),wood,28,10);
+ limb([[0,0,0],[-.32,.25,.12],[.26,.6,-.15],[0,1,0]],[.3,.23,.11,.018],(g,h)=>({anchor:new T.Vector3(),length:new T.Vector3(.15+g*.85,h, .15+g*.85),thickness:(.022+.278*Math.pow(g,1.7))/.3}),wood,28,10);
+ // Supporting stems emerge later and weave around the original living stem.
+ for(const side of [-1,1])limb([[side*.12,0,0],[side*.35,.25,-side*.12],[-side*.25,.55,side*.10],[side*.12,.86,0]],[.14,.11,.07,.012],(g,h)=>{const a=phase(g,.34,1);return {anchor:new T.Vector3(),length:new T.Vector3(a,h*a,a),thickness:a};},wood,24,8);
  for(let i=0;i<7;i++){
   const angle=i*Math.PI*2/7+.12,start=.18+i*.026,attach=.57+(i%3)*.07,reach=1.95+random()*.3,rise=.55+random()*.3;
   const x=Math.cos(angle),z=Math.sin(angle);branches.push({angle,start,attach,reach,rise});
@@ -68,7 +70,7 @@ export function createGrowingBanyanTree({detail='full',seed=1987}:{detail?:'full
    }else{
     const b=branches[s.branch%7],age=phase(g,b.start,.8+(s.branch%7)*.02),spread=.20+phase(g,.32,1)*.88;
     const centre=s.branch===7?new T.Vector3(0,height,0):new T.Vector3(Math.cos(b.angle)*b.reach*age,height*b.attach+b.rise*age,Math.sin(b.angle)*b.reach*age);
-    dummy.position.set(centre.x+s.dx*spread,centre.y+s.dy*spread*.72,centre.z+s.dz*spread*.8);dummy.scale.set(s.size*1.25,s.size*.09,s.size*.65);dummy.rotation.set((s.shade-.5)*2.8,s.rotation,(s.shade-.5)*2.4);
+    dummy.position.set(centre.x+s.dx*spread,centre.y+s.dy*spread*.72,centre.z+s.dz*spread*.8);dummy.scale.set(s.size*.88,s.size*.62,s.size*.82);dummy.rotation.set((s.shade-.5)*2.8,s.rotation,(s.shade-.5)*2.4);
    }
    jade.setHSL(.23+s.shade*.055,.60,.36+s.shade*.12);rose.setHSL(.88+s.shade*.065,.74,.49+s.shade*.13);color.copy(i<20?jade:rose);dummy.updateMatrix();foliage.setMatrixAt(i,dummy.matrix);foliage.setColorAt(i,color);
   }

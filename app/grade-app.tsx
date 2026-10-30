@@ -9,6 +9,7 @@ import './teacher-tools.css';
 import './attendance-qr.css';
 import {AttendanceQrCheckIn} from '@/components/grade/attendance-qr';
 import './bulles-experience.css';
+import './catalog-world.css';
 import {Attendance,NotificationCenter,StudentCases} from '@/components/grade/teacher-tools';
 import {QuestionBank} from '@/components/grade/question-bank';
 import {Snapshots} from '@/components/grade/snapshots';

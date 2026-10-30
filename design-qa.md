@@ -37,3 +37,19 @@ Both backgrounds were generated with ImageGen for this implementation, with no r
 2. `public/experience/gallery-sky.webp`: dark indigo cosmic atmosphere, fine stars and curved nebula near the edges, open central space, no objects, UI, logo or text.
 
 Generated PNG originals remain in the user's Codex generated-images folder. Optimized WebP assets total 274,222 bytes.
+
+
+## KRUNIK reference adaptation — 29 October 2026
+
+The user selected the KRUNIK SUPAKIT Google Apps Script learning-media portal as Grade's new design reference. Inspected its public main world, tutorial, rotation/zoom controls and subject constellation. The adaptation uses Grade's own model, original assets, data and branding; it does not connect to or modify the reference's Google Sheet.
+
+- Purple/lavender/pink/coral atmosphere, floating clouds and rounded faceted islands; a woven blue-purple trunk and soft pink canopy retain anatomy-based, score-dependent growth.
+- Actual 360-degree horizontal rotation with vertical camera orbit (bounded elevation to avoid flipping), wheel/button/pinch zoom, reset, keyboard controls and on-screen help. Geometry is pooled, clouds/leaves are instanced, pixel ratio capped, and reduced motion/paused/background rendering are supported.
+- Course names stay visible inside bubbles with transparent backgrounds and text shadows. Search filters course names/codes while preserving the correct selected course.
+- Subject-specific constellation galleries use real three-dimensional shapes and a readable classroom/task panel. All sample files remain teacher-provided; submissions are private.
+- Desktop and mobile QA used only the disposable local fixture: math room 6/1=10%, 6/2=80%; course-code search; zoom bounds; reset/rotation controls; open/back navigation; both sample tasks and the teacher follow-up action. Names' computed background color was transparent.
+- Production build and TypeScript pass. Existing tree anatomy, independent scope, and pending-work/privacy checks pass. No production school records were changed.
+
+Temporary screenshots are stored outside this repository in outputs/Grade-v27-*.png. The existing large-client-chunk warning remains; no measured FPS guarantee is claimed.
+
+30 October follow-up: read the user-owned Index.html through the school-account Apps Script editor. It uses Three.js OrbitControls with damping, no pan, bounded polar angles and zoom. Grade now supports vertical pointer drags, up/down buttons, keyboard arrows and reset alongside its unrestricted horizontal rotation. Verified actual vertical drag changes the projected view without opening a bubble. Mobile header uses content-sized grid rows so long subject names do not overlap the gallery panel. No source-project code or settings were changed.

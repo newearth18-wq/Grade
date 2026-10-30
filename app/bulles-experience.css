@@ -132,8 +132,8 @@
 @media(max-width:420px){.gallery-code{display:none}.explore-shell .island-focused-label{inset:auto 13% 136px}.explore-shell .island-focused-label h3{font-size:25px}.explore-shell .experience-tools button{padding-inline:9px}.explore-shell .experience-tools .menu-trigger{gap:4px}.gallery-title[data-slot=dialog-title]{font-size:30px}.gallery-classrooms{flex-direction:column;align-items:center}.gallery-classrooms>button{width:100%}}
 @media(prefers-reduced-motion:reduce){.bubble-gallery[data-slot=dialog-content],.bubble-gallery[data-state],.gallery-center{animation:none!important}.explore-shell .bubble-caption{transition:none}}
 
-.explore-shell .orbit-bubble>.bubble-subject-name{position:absolute;left:10%;right:10%;bottom:18%;max-width:none;padding:5px 8px;border-radius:10px;background:#fff8eced;color:#432d59;font-size:14px;line-height:1.45;font-weight:600;white-space:normal;overflow-wrap:anywhere;max-height:6.5em;overflow:auto;scrollbar-width:thin;pointer-events:none;text-align:center}
-.explore-shell .bubble-has-art>.bubble-subject-name{background:#fff8ecf2}
+.explore-shell .orbit-bubble>.bubble-subject-name{position:absolute;left:10%;right:10%;bottom:18%;max-width:none;padding:5px 8px;background:transparent;color:#432d59;text-shadow:0 1px 3px #ffffff99;font-size:14px;line-height:1.45;font-weight:600;white-space:normal;overflow-wrap:anywhere;max-height:6.5em;overflow:auto;scrollbar-width:thin;pointer-events:none;text-align:center}
+.explore-shell .bubble-has-art>.bubble-subject-name{color:#fff8eb;text-shadow:0 1px 4px #29183ad9,0 0 10px #29183a99}
 .explore-shell .orbit-bubble:not(.bubble-has-art)>.bubble-art{justify-content:flex-start;padding-top:23px;gap:6px}
 .explore-shell .orbit-bubble:not(.bubble-has-art) .bubble-art svg{width:27px;height:27px}
 .explore-shell .orbit-bubble:not(.bubble-has-art) .bubble-art>span{font-size:16px}
