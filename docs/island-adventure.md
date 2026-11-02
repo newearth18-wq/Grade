@@ -6,15 +6,15 @@ Student islands have a companion and one selectable decoration. Unlocks derive f
 
 | Distinct submitted assignments | Unlock |
 | --- | --- |
-| 0 | Bunny companion |
+| 0 | Bunny, fox and owl companions (freely selectable) |
 | 1 | Lantern decoration |
-| 3 | Mushroom village and fox companion |
-| 5 | Fireflies and owl companion |
+| 3 | Mushroom village |
+| 5 | Fireflies |
 | 10 | Rainbow |
 
 Unlock counts are scoped to the signed-in student and the selected tree's course/room/period. Repeated uploads of the same assignment do not increase the distinct count. Paper marks alone do not grant upload rewards. Returning an assignment for correction does not take away an already-earned decoration. Selecting locked cosmetics from stale or modified browser storage is rejected by the derived appearance function.
 
-Only cosmetic choices are in local storage, keyed by user, period and course. Unlock eligibility is recomputed from authenticated Grade state after refresh. Cosmetics are personal, do not change marks, and are not a security boundary. The 3D tree itself still uses actual teacher-reviewed scores. Scene props reuse geometry and share the existing renderer, with no extra canvas, textures, shadows or per-frame geometry creation.
+Decoration choices remain in local storage, keyed by user, period and course; decoration eligibility is recomputed from authenticated Grade state. Companion species, name and personality are saved in the private server island profile. All three species are available without submissions and can be chosen directly below the island introduction. Existing browser choices remain visible until an explicit account choice is saved; that account choice takes priority on every device. Cosmetics are personal and do not change marks. The 3D tree itself still uses actual teacher-reviewed scores. Scene props reuse geometry and share the existing renderer, with no extra canvas, textures, shadows or per-frame geometry creation.
 
 The island panel links directly to the next actionable assignment, prioritizes returned work and shows remaining assignments needed for the next reward. Submission celebration displays newly unlocked items only after refreshed server state confirms them, then offers the next assignment or a return to the island. The celebration has a viewport height limit and scrolls on short screens.
 

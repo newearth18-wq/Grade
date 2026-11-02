@@ -12,8 +12,8 @@ assert.equal(islandAdventure({...submitted(5),enrollments:[]},c).unlocked.length
 assert.equal(islandAdventure(submitted(5),{...c,id:'other-room'}).unlocked.length,0);
 assert.equal(islandAdventure({...submitted(5),submissions:submitted(5).submissions.map(s=>({...s,student_id:'other'}))},c).unlocked.length,0);
 assert.equal(islandAdventure({...submitted(5),submissions:submitted(5).submissions.map(s=>({...s,source:'paper'}))},c).unlocked.length,0);
-assert.deepEqual(islandAppearance(0,{decoration:'rainbow',companion:'owl'}),{decoration:'none',companion:'bunny'});
-assert.deepEqual(islandAppearance(3,{decoration:'rainbow',companion:'owl'}),{decoration:'mushrooms',companion:'bunny'});
+assert.deepEqual(islandAppearance(0,{decoration:'rainbow',companion:'owl'}),{decoration:'none',companion:'owl'});
+assert.deepEqual(islandAppearance(3,{decoration:'rainbow',companion:'owl'}),{decoration:'mushrooms',companion:'owl'});
 assert.equal(islandAppearance(10,{decoration:'none'}).decoration,'none');
 // A gesture is mapped from its origin: coalesced/sparse pointer events cannot change the result.
 const origin={angle:1,pitch:.1},finish=dragOrbit(origin,120,-70,800,600);

@@ -5,5 +5,5 @@ export const islandRewards=[
  {id:'rainbow',icon:'🌈',name:'สายรุ้งแห่งความสำเร็จ',goal:10,text:'สะพานสีสันเหนือเกาะของคุณ'}
 ] as const;
 export type IslandDecoration='none'|typeof islandRewards[number]['id'];
-export const companions=[{id:'bunny',icon:'🐰',name:'น้องกระต่าย',goal:0},{id:'fox',icon:'🦊',name:'น้องจิ้งจอก',goal:3},{id:'owl',icon:'🦉',name:'น้องฮูก',goal:5}] as const;
+export const companions=[{id:'bunny',icon:'🐰',name:'น้องกระต่าย',goal:0},{id:'fox',icon:'🦊',name:'น้องจิ้งจอก',goal:0},{id:'owl',icon:'🦉',name:'น้องฮูก',goal:0}] as const;
 export type IslandCompanion=typeof companions[number]['id'];
