@@ -1,3 +1,4 @@
+import {personalities} from './adventure-plus';
 import {all,one,stmt,fail,jsonBody,reply,integer,string} from './server';
 import {ownCourse,type User} from './auth';
 import {communityProgress,profileValue,houseColors,type IslandProfile} from './adventure-life';
@@ -36,10 +37,11 @@ export async function adventureRoute(r:Request,u:User,path:string,method:string)
  const key=profileKey(u.id,c.id),row=await one('SELECT value FROM settings WHERE key=?',key),current=profileValue(parse(row?.value));
  if(method==='GET')return reply({profile:current,challenge:(await classChallenges('c.id=?',[c.id]))[0]});
  if(method!=='PATCH')return null;
- const b=await jsonBody(r),keys=Object.keys(b);if(keys.some(k=>!['expectedRevision','companionName','houseColor','goalIds'].includes(k))||!keys.some(k=>k!=='expectedRevision'))fail(400,'ข้อมูลตั้งค่าเกาะไม่ถูกต้อง');
+ const b=await jsonBody(r),keys=Object.keys(b);if(keys.some(k=>!['expectedRevision','companionName','personality','houseColor','goalIds'].includes(k))||!keys.some(k=>k!=='expectedRevision'))fail(400,'ข้อมูลตั้งค่าเกาะไม่ถูกต้อง');
  const expected=integer(b.expectedRevision,'รุ่นข้อมูล',0,2147483647);if(expected!==current.revision)fail(409,'มีการแก้ไขจากอีกหน้าต่าง กรุณาโหลดข้อมูลล่าสุดก่อนบันทึก');
  const next:IslandProfile={...current,revision:current.revision+1};
  if('companionName' in b){if(typeof b.companionName!=='string'||b.companionName.trim().length>24||/[\x00-\x1f\x7f]/.test(b.companionName))fail(400,'ชื่อคู่หูต้องยาวไม่เกิน 24 ตัวอักษร');next.companionName=b.companionName.trim();}
+ if('personality' in b){if(!personalities.some(p=>p.id===b.personality))fail(400,'เลือกบุคลิกจากรายการ');next.personality=b.personality;}
  if('houseColor' in b){if(!houseColors.some(color=>color.id===b.houseColor))fail(400,'เลือกสีบ้านจากรายการ');next.houseColor=b.houseColor;}
  if('goalIds' in b){
   if(c.archived||c.published)fail(409,'รายวิชานี้ปิดรับงานแล้ว');

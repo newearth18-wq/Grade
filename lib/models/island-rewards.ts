@@ -1,3 +1,4 @@
+import type {Personality} from '../adventure-plus';
 import * as T from 'three';
 import type {IslandCompanion,IslandDecoration} from '../island-adventure';
 import type {HouseColor} from '../adventure-life';
@@ -32,12 +33,12 @@ export function createIslandRewards(){
   buddies.set(id,buddy);group.add(buddy);
  }
  let lastAction=0,lastSent=-1,cheerStart=-100,activeBuddy:T.Group|undefined;
- function update(decoration:IslandDecoration,companion:IslandCompanion|undefined,time:number,still:boolean,options:{homeStage?:number;houseColor?:HouseColor;communityStage?:number;cheer?:number;sent?:number}={}){
+ function update(decoration:IslandDecoration,companion:IslandCompanion|undefined,time:number,still:boolean,options:{homeStage?:number;houseColor?:HouseColor;communityStage?:number;cheer?:number;sent?:number;personality?:Personality}={}){
   const sent=options.sent??0,action=options.cheer??0;if(action!==lastAction||lastSent>=0&&sent>lastSent)cheerStart=time;lastAction=action;lastSent=sent;
   const cheering=time-cheerStart<2.8;decorations.forEach((g,id)=>g.visible=id===decoration);activeBuddy=undefined;
   buddies.forEach((g,id)=>{
    g.visible=id===companion;if(!g.visible)return;activeBuddy=g;
-   if(!still){const phase=time*.42;g.position.set(cheering?.55+Math.sin(time*5)*.13:.84+Math.sin(phase)*.28,.14+(cheering?Math.abs(Math.sin(time*7))*.16:Math.abs(Math.sin(time*3))*.025),cheering?1.35:1.02+Math.cos(phase)*.20);g.rotation.y=cheering?Math.sin(time*4)*.25:Math.atan2(Math.cos(phase)*.28,-Math.sin(phase)*.20);feet.get(id)?.forEach((foot,i)=>{foot.rotation.x=Math.sin(time*(cheering?8:4)+i*Math.PI)*.35;});const tail=tails.get(id);if(tail)tail.rotation.z=.5+Math.sin(time*5)*.18;const head=heads.get(id);if(head)head.rotation.z=Math.sin(time*1.5)*.05;}
+   if(!still){const playful=options.personality==='playful',curious=options.personality==='curious',speed=playful?1.5:curious?.8:1,phase=time*.42*speed;g.position.set(cheering?.55+Math.sin(time*5)*.13:.84+Math.sin(phase)*.28,.14+(cheering?Math.abs(Math.sin(time*7))*.16:Math.abs(Math.sin(time*3*speed))*(playful?.06:.025)),cheering?1.35:1.02+Math.cos(phase)*.20);g.rotation.y=cheering?Math.sin(time*4)*.25:Math.atan2(Math.cos(phase)*.28,-Math.sin(phase)*.20);feet.get(id)?.forEach((foot,i)=>{foot.rotation.x=Math.sin(time*(cheering?8:4)+i*Math.PI)*.35;});const tail=tails.get(id);if(tail)tail.rotation.z=.5+Math.sin(time*5)*.18;const head=heads.get(id);if(head)head.rotation.z=Math.sin(time*1.5)*(curious?.18:.05);}
   });
   fireflies.rotation.y=still?fireflies.rotation.y:time*.12;lights.material.opacity=still?lights.material.opacity:.75+Math.sin(time*2)*.15;
   life.update(options.homeStage??-1,options.houseColor??'lavender',options.communityStage??0,time,still);

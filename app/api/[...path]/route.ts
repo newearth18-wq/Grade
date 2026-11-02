@@ -1,3 +1,4 @@
+import {adventurePlusRoute} from '@/lib/adventure-plus-server';
 import {driveRemoteRoute,driveSettingsRoute} from '@/lib/drive-backup-server';
 import { all, one, stmt, database, bucket, HttpError, fail, uid, now, string, number, integer, jsonBody, reply, ensureSameOrigin, log,requireLive,isTrashed } from '@/lib/server';
 import { currentUser, requireUser, teacher, ownCourse, hashPassword, matches, passwordValid, session, cookie, digest, upgradeStudentInitialPassword, type User } from '@/lib/auth';
@@ -74,6 +75,7 @@ async function handle(r:Request){
   const hash=await hashPassword(passwordValid(b.password));await database().batch([stmt('UPDATE users SET password=?,must_change=0 WHERE id=?',hash,u.id),stmt('DELETE FROM sessions WHERE user_id=?',u.id)]);return reply({ok:true},200,{'Set-Cookie':await session(r,u.id)});
  }
  if(u.must_change)fail(403,'กรุณาเปลี่ยนรหัสผ่านชั่วคราวก่อนใช้งาน');
+ const plusResponse=await adventurePlusRoute(r,u,path,method);if(plusResponse)return plusResponse;
  const adventureResponse=await adventureRoute(r,u,path,method);if(adventureResponse)return adventureResponse;
  const qrResponse=await attendanceQrRoute(r,u,path,method);if(qrResponse)return qrResponse;
  const teacherResponse=await teacherRoute(r,u,path,method);if(teacherResponse)return teacherResponse;
@@ -182,7 +184,7 @@ async function handle(r:Request){
  fail(404,'ไม่พบคำสั่ง');
 }
 async function route(r:Request){try{return await handle(r);}catch(e){if(e instanceof HttpError)return reply({error:e.message},e.status);console.error('Grade API error',e);return reply({error:'บันทึกหรือโหลดข้อมูลไม่สำเร็จ กรุณาลองใหม่ ข้อมูลที่กรอกยังอยู่ในหน้าเดิม'},503);}}
-export const GET=route;export const POST=route;export const PATCH=route;
+export const GET=route;export const POST=route;export const PATCH=route;export const DELETE=route;
 
 
 

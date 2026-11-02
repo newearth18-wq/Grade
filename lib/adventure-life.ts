@@ -1,12 +1,13 @@
+import {personalities,type Personality} from './adventure-plus';
 import type {AppState,Row} from './client';
 import type {studentJourney} from './student-journey';
 export const homeStages=[{name:'ลานสร้างบ้าน',goal:0},{name:'เต็นท์อุ่นใจ',goal:1},{name:'กระท่อมเพื่อนรัก',goal:3},{name:'บ้านต้นไม้',goal:5},{name:'บ้านร่มไทร',goal:10}];
 export const houseColors=[{id:'lavender',name:'ม่วงลาเวนเดอร์',hex:'#b99bd9'},{id:'mint',name:'เขียวมิ้นต์',hex:'#94cdb5'},{id:'peach',name:'ส้มพีช',hex:'#edb796'}] as const;
 export type HouseColor=typeof houseColors[number]['id'];
-export type IslandProfile={revision:number;companionName:string;houseColor:HouseColor;goalDate:string;goalIds:string[]};
+export type IslandProfile={revision:number;companionName:string;personality:Personality;houseColor:HouseColor;goalDate:string;goalIds:string[]};
 export const bangkokDay=(time=Date.now())=>new Date(time+7*3600000).toISOString().slice(0,10);
 export function profileValue(value:any,time=Date.now()):IslandProfile{
- const today=bangkokDay(time);return {revision:Number.isSafeInteger(value?.revision)&&value.revision>=0?value.revision:0,companionName:typeof value?.companionName==='string'?value.companionName.slice(0,24):'',houseColor:houseColors.some(c=>c.id===value?.houseColor)?value.houseColor:'lavender',goalDate:today,goalIds:value?.goalDate===today&&Array.isArray(value?.goalIds)?[...new Set<string>(value.goalIds.filter((id:unknown)=>typeof id==='string'&&id.length<=100))].slice(0,3):[]};
+ const today=bangkokDay(time);return {revision:Number.isSafeInteger(value?.revision)&&value.revision>=0?value.revision:0,personality:personalities.some(p=>p.id===value?.personality)?value.personality:'gentle',companionName:typeof value?.companionName==='string'?value.companionName.slice(0,24):'',houseColor:houseColors.some(c=>c.id===value?.houseColor)?value.houseColor:'lavender',goalDate:today,goalIds:value?.goalDate===today&&Array.isArray(value?.goalIds)?[...new Set<string>(value.goalIds.filter((id:unknown)=>typeof id==='string'&&id.length<=100))].slice(0,3):[]};
 }
 export function homeProgress(sent:number){const stage=homeStages.findLastIndex(h=>sent>=h.goal),next=homeStages[stage+1];return {stage,name:homeStages[stage].name,next,parts:sent,remaining:next?Math.max(0,next.goal-sent):0};}
 /** Cosmetic greeting only: revisions can trigger delight without granting another house part. */
