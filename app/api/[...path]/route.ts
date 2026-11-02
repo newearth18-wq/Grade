@@ -9,6 +9,7 @@ import {publicationCheck} from '@/lib/teacher-logic';
 import {groupRoute,submissionGroup} from '@/lib/groups-server';
 import { getState } from '@/lib/state';
 import {trashRoute} from '@/lib/trash-server';
+import {adventureRoute} from '@/lib/adventure-server';
 import {examRoute} from '@/lib/exam-server';
 import { extendedRoute } from '@/lib/extended-server';
 import { parseRubric,validateRubric,rubricScore } from '@/lib/rubrics';
@@ -73,6 +74,7 @@ async function handle(r:Request){
   const hash=await hashPassword(passwordValid(b.password));await database().batch([stmt('UPDATE users SET password=?,must_change=0 WHERE id=?',hash,u.id),stmt('DELETE FROM sessions WHERE user_id=?',u.id)]);return reply({ok:true},200,{'Set-Cookie':await session(r,u.id)});
  }
  if(u.must_change)fail(403,'กรุณาเปลี่ยนรหัสผ่านชั่วคราวก่อนใช้งาน');
+ const adventureResponse=await adventureRoute(r,u,path,method);if(adventureResponse)return adventureResponse;
  const qrResponse=await attendanceQrRoute(r,u,path,method);if(qrResponse)return qrResponse;
  const teacherResponse=await teacherRoute(r,u,path,method);if(teacherResponse)return teacherResponse;
  const snapshotResponse=await snapshotsRoute(r,u,path,method);if(snapshotResponse)return snapshotResponse;

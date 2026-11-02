@@ -1,5 +1,5 @@
 export type Row={id:string;[key:string]:any};
-export type AppState={attendanceSessions?:Row[];attendanceRecords?:Row[];followupNotes?:Row[];notificationReads?:Row[];user:Row;periods:Row[];subjects:Row[];courses:Row[];enrollments:Row[];assignments:Row[];submissions:Row[];files:Row[];students:Row[];extensions:Row[];staff:Row[];people:Row[];profiles:Row[];history:Row[]};
+export type AppState={islandPreferences?:Row[];classChallenges?:Row[];attendanceSessions?:Row[];attendanceRecords?:Row[];followupNotes?:Row[];notificationReads?:Row[];user:Row;periods:Row[];subjects:Row[];courses:Row[];enrollments:Row[];assignments:Row[];submissions:Row[];files:Row[];students:Row[];extensions:Row[];staff:Row[];people:Row[];profiles:Row[];history:Row[]};
 export type ImportRow={code:string;name:string;number:number};
 export class ApiError extends Error {constructor(message:string,public status=0){super(message);this.name='ApiError';}}
 export async function api(path:string,body?:unknown,method='POST'):Promise<any>{
