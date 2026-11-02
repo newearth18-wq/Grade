@@ -74,3 +74,7 @@
  .gallery-pagination{padding:13px 15px 58px;gap:17px}.gallery-pagination button{width:32px;height:32px}.gallery-motion{bottom:17px;left:20px;padding:8px 11px;font-size:10px}
 }
 @media(prefers-reduced-motion:reduce){.scene-help-panel,.gallery-float{transition:none}}
+
+/* Keep vertical dragging inside the 3D view; the surrounding page still scrolls. */
+.explore-shell .island-stage{touch-action:none;overscroll-behavior:contain;user-select:none;-webkit-user-select:none}
+.explore-shell .island-adventure{flex:none;pointer-events:auto}

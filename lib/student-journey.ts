@@ -1,4 +1,5 @@
 import type {AppState,Row} from './client';
+import {islandRewards,companions} from './adventure-catalog';
 
 const DAY=86400000;
 const stamp=(v:unknown)=>typeof v==='string'?Date.parse(v):NaN;
@@ -36,5 +37,5 @@ export function studentJourney(state:AppState,courses:Row[],time=Date.now()){
 }
 
 export function journeyReward(before:ReturnType<typeof studentJourney>,after:ReturnType<typeof studentJourney>){
- return {xp:Math.max(0,after.xp-before.xp),level:after.level,leveled:after.level>before.level,badges:after.badges.filter(b=>b.earned&&!before.badges.find(x=>x.id===b.id)?.earned).map(b=>b.name),themes:[{xp:60,name:'สวนอาทิตย์ตก'},{xp:150,name:'สวนใต้แสงดาว'}].filter(t=>before.xp<t.xp&&after.xp>=t.xp).map(t=>t.name)};
+ return {discoveries:[...islandRewards,...companions.filter(c=>c.goal>0)].filter(r=>before.sent<r.goal&&after.sent>=r.goal).map(r=>({name:r.name,icon:r.icon})),nextAssignmentId:after.next?.a.id as string|undefined,nextTitle:after.next?.a.title as string|undefined,xp:Math.max(0,after.xp-before.xp),level:after.level,leveled:after.level>before.level,badges:after.badges.filter(b=>b.earned&&!before.badges.find(x=>x.id===b.id)?.earned).map(b=>b.name),themes:[{xp:60,name:'สวนอาทิตย์ตก'},{xp:150,name:'สวนใต้แสงดาว'}].filter(t=>before.xp<t.xp&&after.xp>=t.xp).map(t=>t.name)};
 }
