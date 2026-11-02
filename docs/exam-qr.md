@@ -1,0 +1,11 @@
+# QR exam entry
+
+Teachers with edit permission open a midterm/final exam, then click **QR เข้าสอบ** on that exam card. The dialog shows course, classroom, type, duration and maximum mark, with a QR image, copyable URL and downloadable PNG. The button is disabled unless the exam is open and the course is active. Activity courses retain their existing no-exam policy.
+
+Students scan using their phone camera. The URL uses `/#exam=<exam UUID>` and contains no login credentials, teacher unlock code, answer key or bearer permission. Grade keeps the pending destination in tab-scoped session storage across login/reload, removes the fragment from the address bar, and replaces any pending attendance scan when a different kind of QR is opened. Attendance QR links keep their original format and behavior.
+
+The authenticated, student-only `GET /api/exam-entry/:id` checks the live exam/course/period/subject, active live registration, exam status, and any existing attempt. It returns only safe exam/course metadata and minimal own-attempt status. It neither creates nor settles/unlocks attempts and never returns questions, answers, provisional marks, page tokens or teacher hashes. QR URLs are navigation links: anyone who copies one must still pass all account and enrollment checks.
+
+Students confirm course/classroom and acknowledge the existing rules before starting. Start calls the existing authenticated `/api/exams/:id/start`; all timer, persistent lock, PIN unlock, duplicate-attempt, submission and score-publication behavior stays in that path. Closing an exam after preview still prevents start. Re-scanning cannot reset a deadline or clear a lock. A submitted attempt shows a submitted state instead of another start button. No attendance record is created by scanning an exam QR.
+
+Validation: `node tests/exam-entry.mjs` decodes QR images for both exam kinds and checks authentication, room boundaries, draft/closed/archived/activity/trashed records, inactive/deleted registration, metadata privacy, read-only preview, deadlines, locks, teacher PIN, duplicate/submitted attempts and unchanged unpublished grade fields. Existing teacher-upgrade and attendance-QR suites cover their preserved behaviors. Browser QA uses only a disposable local classroom.
