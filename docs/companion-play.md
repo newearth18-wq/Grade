@@ -2,6 +2,8 @@
 
 Students open the new optional playroom below their companion picker. Existing pastel Grade surfaces and the three chosen species are retained.
 
+The character renderer now uses original soft-toy rigs in `lib/models/companion-characters.ts`: articulated heads with attached eyes/muzzles/ears, glossy highlights and blinking, distinct fox tail, rabbit ears and owl wings. Hat and neck mounts belong to the character rig so outfits follow the correct body parts. The wardrobe studio uses a front-facing portrait pose, larger viewport, calibrated ground height and softer tone-mapped lighting; the main island keeps its roaming animation. Shared geometry is allocated only at creation and reused across frames/species changes.
+
 ## Care and responses
 
 Feed, play ball and send hearts. Both the main island and the local 3D studio use the existing companion meshes, with a feeding bowl, moving ball and rising hearts. Cues are transient and scoped to the current course so changing classroom cannot replay another room's interaction. Reduced motion and scene pause show static responses; hidden/offscreen studio rendering is skipped. All models share stable geometry and materials, disposed when the studio unmounts.

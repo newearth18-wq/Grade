@@ -1,18 +1,18 @@
 import * as T from 'three';
 import type {Hat,Accessory,IslandProp,CareCue} from '../companion-play';
 export function createCompanionPlayModel(){
- const group=new T.Group(),outfits=new Map<T.Group,{hats:Map<Hat,T.Group>;accessories:Map<Accessory,T.Group>}>(),sphere=new T.SphereGeometry(1,8,6),box=new T.BoxGeometry(1,1,1),cylinder=new T.CylinderGeometry(1,1,1,10),cone=new T.ConeGeometry(1,1,10),wood=new T.MeshStandardMaterial({color:0xa58276,roughness:1}),pink=new T.MeshStandardMaterial({color:0xf1a3ca}),gold=new T.MeshStandardMaterial({color:0xffd880}),mint=new T.MeshStandardMaterial({color:0x9acdb6}),blue=new T.MeshStandardMaterial({color:0xa4c8f0}),cream=new T.MeshStandardMaterial({color:0xffe8bf});
+ const group=new T.Group(),outfits=new Map<T.Group,{hats:Map<Hat,T.Group>;accessories:Map<Accessory,T.Group>}>(),sphere=new T.SphereGeometry(1,20,14),box=new T.BoxGeometry(1,1,1),cylinder=new T.CylinderGeometry(1,1,1,10),cone=new T.ConeGeometry(1,1,10),wood=new T.MeshStandardMaterial({color:0xa58276,roughness:1}),pink=new T.MeshStandardMaterial({color:0xf1a3ca}),gold=new T.MeshStandardMaterial({color:0xffd880}),mint=new T.MeshStandardMaterial({color:0x9acdb6}),blue=new T.MeshStandardMaterial({color:0xa4c8f0}),cream=new T.MeshStandardMaterial({color:0xffe8bf});
  function mesh(parent:T.Group,geo:T.BufferGeometry,mat:T.Material,p:number[],s:number[]){const m=new T.Mesh(geo,mat);m.position.set(...p as [number,number,number]);m.scale.set(...s as [number,number,number]);parent.add(m);return m;}
- function attach(buddy:T.Group){
+ function attach(buddy:T.Group,mounts?:{head:T.Group;neck:T.Group}){
   const hats=new Map<Hat,T.Group>(),accessories=new Map<Accessory,T.Group>();
-  for(const id of ['flower','crown','cap'] as const){const g=new T.Group();g.visible=false;g.position.set(0,.59,0);buddy.add(g);hats.set(id,g);
-   if(id==='flower'){for(let i=0;i<5;i++){const a=i*Math.PI*2/5;mesh(g,sphere,pink,[Math.cos(a)*.075,.09+Math.sin(a)*.075,.08],[.055,.055,.025]);}mesh(g,sphere,gold,[0,.09,.105],[.042,.042,.025]);}
-   if(id==='crown'){mesh(g,cylinder,gold,[0,.025,0],[.19,.065,.16]);for(let i=0;i<5;i++){const a=i*Math.PI*2/5;mesh(g,cone,gold,[Math.cos(a)*.15,.105,Math.sin(a)*.13],[.055,.15,.055]);}}
-   if(id==='cap'){mesh(g,sphere,mint,[0,.03,0],[.19,.12,.17]);mesh(g,sphere,mint,[0,-.025,.14],[.21,.025,.14]);}
+  for(const id of ['flower','crown','cap'] as const){const g=new T.Group();g.visible=false;g.position.set(0,mounts?0:.59,0);(mounts?.head||buddy).add(g);hats.set(id,g);
+   if(id==='flower'){g.position.set(.19,.015,.11);for(let i=0;i<5;i++){const a=i*Math.PI*2/5;mesh(g,sphere,pink,[Math.cos(a)*.075,.09+Math.sin(a)*.075,.08],[.055,.055,.025]);}mesh(g,sphere,gold,[0,.09,.105],[.042,.042,.025]);}
+   if(id==='crown'){mesh(g,cylinder,gold,[0,.025,0],[.27,.065,.235]);for(let i=0;i<5;i++){const a=i*Math.PI*2/5;mesh(g,cone,gold,[Math.cos(a)*.23,.105,Math.sin(a)*.20],[.055,.15,.055]);}}
+   if(id==='cap'){const dome=new T.SphereGeometry(1,28,16,0,Math.PI*2,0,Math.PI/2);mesh(g,dome,mint,[0,.018,0],[.29,.16,.25]);mesh(g,sphere,mint,[0,.01,.19],[.30,.028,.18]);mesh(g,sphere,cream,[0,.18,0],[.027,.017,.027]);}
   }
-  for(const id of ['bow','scarf'] as const){const g=new T.Group();g.visible=false;g.position.set(0,.29,.15);buddy.add(g);accessories.set(id,g);
+  for(const id of ['bow','scarf'] as const){const g=new T.Group();g.visible=false;g.position.set(0,mounts?0:.29,mounts?.neck?0:.15);(mounts?.neck||buddy).add(g);accessories.set(id,g);
    if(id==='bow'){for(const side of [-1,1]){const wing=mesh(g,sphere,pink,[side*.065,0,.01],[.08,.055,.03]);wing.rotation.z=side*.3;}mesh(g,sphere,gold,[0,0,.04],[.035,.035,.025]);}
-   else {mesh(g,cylinder,blue,[0,0,-.15],[.19,.07,.17]);const tail=mesh(g,box,blue,[.10,-.12,.015],[.075,.20,.025]);tail.rotation.z=.3;}
+   else {const collar=new T.Mesh(new T.TorusGeometry(.19,.038,10,30),blue);collar.rotation.x=Math.PI/2;collar.position.z=-.10;g.add(collar);const tail=mesh(g,box,blue,[.10,-.12,.015],[.075,.20,.025]);tail.rotation.z=.3;}
   }outfits.set(buddy,{hats,accessories});
  }
  const props=new Map<IslandProp,T.Group>();for(const id of ['swing','pond','picnic'] as const){const g=new T.Group();g.visible=false;g.position.set(-1.1,.15,-.65);group.add(g);props.set(id,g);}

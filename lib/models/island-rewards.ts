@@ -1,3 +1,4 @@
+import {createCompanionCharacters} from './companion-characters';
 import {createCompanionPlayModel} from './companion-play-model';
 import type {Hat,Accessory,IslandProp,CareCue} from '../companion-play';
 import type {Personality} from '../adventure-plus';
@@ -10,7 +11,7 @@ import {createIslandLife} from './island-life';
 export function createIslandRewards(){
  const life=createIslandLife(),playroom=createCompanionPlayModel();
  const group=new T.Group();group.add(life.group,playroom.group);
- const feet=new Map<string,T.Mesh[]>(),heads=new Map<string,T.Mesh>(),tails=new Map<string,T.Mesh>();
+ const characters=createCompanionCharacters(),rigs=new Map<IslandCompanion,ReturnType<typeof characters.create>>();
  const decorations=new Map<string,T.Group>(),buddies=new Map<string,T.Group>();
  const material=(color:number,glow=false)=>new T.MeshStandardMaterial({color,roughness:.8,...(glow?{emissive:color,emissiveIntensity:.6}:{})});
  const cream=material(0xffe5c1),pink=material(0xf3a8c3),wood=material(0x82617f),orange=material(0xe3995d),black=material(0x463451);
@@ -25,27 +26,23 @@ export function createIslandRewards(){
  for(let i=0;i<24;i++){positions[i*3]=Math.cos(i*2.4)*(1+i%4*.25);positions[i*3+1]=.4+i%7*.25;positions[i*3+2]=Math.sin(i*2.4)*(1+i%3*.3);}
  geometry.setAttribute('position',new T.BufferAttribute(positions,3));const lights=new T.Points(geometry,new T.PointsMaterial({color:0xffeb8d,size:.065,transparent:true,opacity:.9,depthWrite:false}));fireflies.add(lights);
  const rainbow=decoration('rainbow');for(let i=0;i<5;i++){const arc=new T.Mesh(new T.TorusGeometry(1.52+i*.085,.035,5,48,Math.PI),material([0xf3a1c8,0xffbd8c,0xf5dc95,0xa4cead,0xb7ade3][i]));arc.position.set(0,.24,-1.22);rainbow.add(arc);}
- for(const id of ['bunny','fox','owl'] as const){
-  const buddy=new T.Group();buddy.visible=false;buddy.position.set(.80,.14,1.10);const fur=id==='fox'?orange:id==='owl'?wood:cream;
-  ball(buddy,fur,[0,.18,0],[.18,.22,.15]);heads.set(id,ball(buddy,fur,[0,.43,0],[.19,.18,.17]));const legs:T.Mesh[]=[];feet.set(id,legs);
-  for(const side of [-1,1]){legs.push(ball(buddy,cream,[side*.11,.025,.06],[.1,.045,.1]));ball(buddy,black,[side*.07,.46,.15],[.025,.033,.018]);if(id==='owl')ball(buddy,cream,[side*.08,.455,.137],[.07,.075,.03]);else{const ear=ball(buddy,fur,[side*.10,id==='bunny'?.71:.62,0],[.06,id==='bunny'?.19:.10,.05]);ear.rotation.z=side*-.22;if(id==='bunny')ball(buddy,pink,[side*.10,.73,.04],[.025,.12,.015]);}}
-  if(id==='owl')for(const side of [-1,1])ball(buddy,black,[side*.07,.46,.17],[.025,.033,.018]);
-  ball(buddy,id==='owl'?orange:pink,[0,.39,.17],[.035,.025,.025]);
-  if(id==='fox'){const tail=ball(buddy,orange,[.21,.18,-.03],[.18,.08,.08]);tail.rotation.z=.5;tails.set(id,tail);ball(buddy,cream,[.34,.25,-.03],[.07,.07,.07]);}
-  playroom.attach(buddy);buddies.set(id,buddy);group.add(buddy);
- }
+ for(const id of ['bunny','fox','owl'] as const){const rig=characters.create(id);playroom.attach(rig.root,{head:rig.hatMount,neck:rig.neckMount});rigs.set(id,rig);buddies.set(id,rig.root);group.add(rig.root);}
  let lastAction=0,lastSent=-1,cheerStart=-100,activeBuddy:T.Group|undefined;
- function update(decoration:IslandDecoration,companion:IslandCompanion|undefined,time:number,still:boolean,options:{homeStage?:number;houseColor?:HouseColor;communityStage?:number;cheer?:number;sent?:number;personality?:Personality;hat?:Hat;accessory?:Accessory;islandProp?:IslandProp;care?:CareCue}={}){
+ function update(decoration:IslandDecoration,companion:IslandCompanion|undefined,time:number,still:boolean,options:{homeStage?:number;houseColor?:HouseColor;communityStage?:number;cheer?:number;sent?:number;personality?:Personality;hat?:Hat;accessory?:Accessory;islandProp?:IslandProp;care?:CareCue;portrait?:boolean}={}){
   const sent=options.sent??0,action=options.cheer??0;if(action!==lastAction||lastSent>=0&&sent>lastSent)cheerStart=time;lastAction=action;lastSent=sent;
   const cheering=time-cheerStart<2.8;decorations.forEach((g,id)=>g.visible=id===decoration);activeBuddy=undefined;
   buddies.forEach((g,id)=>{
    g.visible=id===companion;if(!g.visible)return;activeBuddy=g;
-   if(!still){const playful=options.personality==='playful',curious=options.personality==='curious',speed=playful?1.5:curious?.8:1,phase=time*.42*speed;g.position.set(cheering?.55+Math.sin(time*5)*.13:.84+Math.sin(phase)*.28,.14+(cheering?Math.abs(Math.sin(time*7))*.16:Math.abs(Math.sin(time*3*speed))*(playful?.06:.025)),cheering?1.35:1.02+Math.cos(phase)*.20);g.rotation.y=cheering?Math.sin(time*4)*.25:Math.atan2(Math.cos(phase)*.28,-Math.sin(phase)*.20);feet.get(id)?.forEach((foot,i)=>{foot.rotation.x=Math.sin(time*(cheering?8:4)+i*Math.PI)*.35;});const tail=tails.get(id);if(tail)tail.rotation.z=.5+Math.sin(time*5)*.18;const head=heads.get(id);if(head)head.rotation.z=Math.sin(time*1.5)*(curious?.18:.05);}
+   if(!still){const playful=options.personality==='playful',curious=options.personality==='curious',portrait=!!options.portrait,speed=playful?1.5:curious?.8:1,phase=time*.42*speed;
+    if(portrait){g.position.set(.8+Math.sin(time*.7)*.015,.14+(cheering?Math.abs(Math.sin(time*6))*.10:0),1.1);g.rotation.y=.12+Math.sin(time*.7)*.06;}
+    else{g.position.set(cheering?.55+Math.sin(time*5)*.13:.84+Math.sin(phase)*.28,.14+(cheering?Math.abs(Math.sin(time*7))*.16:Math.abs(Math.sin(time*3*speed))*(playful?.05:.018)),cheering?1.35:1.02+Math.cos(phase)*.20);g.rotation.y=cheering?Math.sin(time*4)*.25:Math.atan2(Math.cos(phase)*.28,-Math.sin(phase)*.20);}
+    rigs.get(id as IslandCompanion)?.animate(time,false,cheering,curious,portrait);
+   }
   });
   playroom.update(time,still,options.hat,options.accessory,options.islandProp,options.care,activeBuddy);
   fireflies.rotation.y=still?fireflies.rotation.y:time*.12;lights.material.opacity=still?lights.material.opacity:.75+Math.sin(time*2)*.15;
   life.update(options.homeStage??-1,options.houseColor??'lavender',options.communityStage??0,time,still);
  }
- function companionPosition(target:T.Vector3){if(!activeBuddy)return false;activeBuddy.getWorldPosition(target);target.y+=.9;return true;}
+ function companionPosition(target:T.Vector3){if(!activeBuddy)return false;activeBuddy.getWorldPosition(target);target.y+=1.20;return true;}
  return {group,update,companionPosition};
 }
