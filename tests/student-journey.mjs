@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import {createElement} from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+await build({stdin:{contents:"export * from './lib/student-journey';export {StudentJourney} from './components/grade/student-journey';export {Celebration} from './components/grade/celebration';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,platform:'node',format:'esm',packages:'external',jsx:'automatic',loader:{'.css':'empty'},outfile:'.sites-runtime/student-journey-test.mjs'});
+const {studentJourney,journeyReward,StudentJourney,Celebration}=await import('../.sites-runtime/student-journey-test.mjs');
+const c={id:'c',period_id:'p',name:'วิชาทดสอบ',archived:0,published:0},other={...c,id:'other'},old={...c,id:'old',period_id:'oldterm'};
+const time=Date.parse('2026-10-11T17:01:00Z'); // Monday 00:01 in Bangkok.
+const task=(id,extra={})=>({id,course_id:'c',title:'งาน '+id,due_at:'2026-10-12T17:00:00Z',...extra});
+const sub=(id,extra={})=>({id:'s-'+id,assignment_id:id,student_id:'me',source:'upload',status:'pending',revision:1,submitted_at:'2026-10-11T17:00:00Z',...extra});
+const file=(id,revision=1,date='2026-10-11T17:00:00Z')=>({id:'f-'+id+'-'+revision,assignment_id:id,student_id:'me',revision,created_at:date});
+const state={user:{id:'me',role:'student'},courses:[c,other,old],enrollments:[c,other,old].map(x=>({id:'e-'+x.id,course_id:x.id,student_id:'me',active:1})),assignments:[task('a'),task('b'),task('g',{is_group:1}),task('other',{course_id:'other'}),task('old',{course_id:'old'})],submissions:[sub('a')],files:[file('a')],extensions:[],periods:[]};
+let j=studentJourney(state,[c],time);assert.equal(j.xp,25);assert.equal(j.weekly,1);assert.equal(j.weekGoal,3);assert.equal(j.weekStart,Date.parse('2026-10-11T17:00:00Z'));assert(j.badges.find(b=>b.id==='first').earned);assert.equal(j.badges.find(b=>b.id==='complete').earned,false);
+const mixed={...state,submissions:[...state.submissions,sub('other'),sub('old'),sub('b',{student_id:'someone'}),sub('g',{source:'paper'})]};assert.equal(studentJourney(mixed,[c],time).xp,25);assert.equal(studentJourney({...mixed,enrollments:[]},[c],time).xp,0);
+const repeated={...state,submissions:[sub('a',{revision:2})],files:[file('a'),file('a',2),{...file('a',2),id:'duplicate'}]};let r=studentJourney(repeated,[c],time);assert.equal(r.xp,35);assert.equal(r.weekly,1);assert.equal(journeyReward(j,r).xp,10);
+const returned={...repeated,submissions:[sub('a',{revision:2,status:'returned'})]};assert.equal(studentJourney(returned,[c],time).xp,35);assert.equal(studentJourney({...returned,submissions:[sub('a',{revision:3})],files:[...repeated.files,file('a',3)]},[c],time).xp,35);assert.equal(studentJourney(returned,[c],time).next.a.id,'a');
+const late={...state,submissions:[sub('a',{submitted_at:'2026-10-12T18:00:00Z'})],files:[file('a',1,'2026-10-12T18:00:00Z')]};assert.equal(studentJourney(late,[c],time+2*86400000).xp,20);assert.equal(studentJourney({...late,extensions:[{assignment_id:'a',student_id:'me',due_at:'2026-10-13T00:00:00Z'}]},[c],time+2*86400000).xp,25);
+assert.equal(studentJourney({...state,submissions:[sub('a',{submitted_at:'2026-10-11T16:59:00Z'})]},[c],time).weekly,0);
+assert.equal(studentJourney(state,[{...c,archived:1}],time).remaining.length,0);assert.equal(studentJourney(state,[{...c,published:1}],time).remaining.length,0);
+const complete={...state,submissions:['a','b','g'].map(id=>sub(id,{status:'graded',score:0})),files:['a','b','g'].map(id=>file(id))};j=studentJourney(complete,[c],time);assert.equal(j.xp,75);assert(j.badges.find(b=>b.id==='team').earned);assert(j.badges.find(b=>b.id==='complete').earned);assert.equal(j.weekGoal,3);assert.equal(j.next,undefined);
+const empty={...state,assignments:[],submissions:[],files:[]};assert.equal(studentJourney(empty,[c],time).weekGoal,0);assert.equal(studentJourney(empty,[c],time).badges.filter(b=>b.earned).length,0);
+const markup=renderToStaticMarkup(createElement(StudentJourney,{state,courses:[c],onTask:()=>{}}));assert(markup.includes('สวนภารกิจของฉัน'));assert(markup.includes('XP แยกจากคะแนนวิชา'));assert(markup.includes('disabled'));assert(markup.includes('สมุดเหรียญความสำเร็จ'));assert(!markup.includes('someone'));
+console.log('PASS Journey: scoped records, actual uploads, no paper/other-person XP, retry cap, returned-work reward retention, Bangkok week rollover, extensions, closed courses, group rewards, empty state and accessible display');

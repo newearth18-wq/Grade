@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {build} from 'esbuild';
+import {createElement} from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+await build({stdin:{contents:"export {Results} from './components/grade/results';export {ScoreSummary} from './components/grade/score-summary';export {Exams} from './components/grade/exams';export {calculateGrade} from './lib/grades';export {resultRows} from './lib/files-client';",resolveDir:process.cwd(),loader:'tsx'},bundle:true,platform:'node',format:'esm',packages:'external',jsx:'automatic',loader:{'.css':'empty'},outfile:'.sites-runtime/activity-test.mjs'});
+const {Results,ScoreSummary,Exams,calculateGrade,resultRows}=await import('../.sites-runtime/activity-test.mjs');
+const c={id:'c',course_type:'activity',pass_threshold:60,work_weight:100,before_work_weight:50,mid_weight:0,final_weight:0,grading_mode:'points',published:1,can_edit:true,name:'แนะแนว',classroom:'6/1'},e={id:'e',course_id:'c',student_id:'s',student_code:'001',name:'นักเรียน',number:1,active:1,mid:null,final:null,special:''};
+const assignments=['before','after'].map((work_phase,i)=>({id:'a'+i,course_id:'c',max_score:50,work_phase}));
+const submissions=assignments.map(a=>({id:'s'+a.id,assignment_id:a.id,student_id:'s',status:'graded',score:40}));
+let g=calculateGrade(c,assignments,submissions,e);assert.equal(g.total,80);assert.equal(g.grade,'ผ');assert.equal(g.complete,true);assert.equal(calculateGrade({...c,pass_threshold:90},assignments,submissions,e).grade,'มผ');assert.equal(calculateGrade(c,assignments,submissions,{...e,mid:20,final:20}).total,80);assert.equal(calculateGrade(c,assignments,[{...submissions[0],status:'pending'}],e).complete,false);
+const state={user:{id:'teacher',role:'admin'},periods:[],enrollments:[e],assignments,submissions,files:[],extensions:[]};
+const html=renderToStaticMarkup(createElement(Results,{state,course:c,refresh:async()=>{}}));assert(html.includes('วิชากิจกรรม ไม่มีสอบ'));assert(html.includes('กิจกรรมช่วงที่ 1'));assert(!html.includes('คะแนนกลางภาค'));assert(!html.includes('คะแนนปลายภาค'));assert(html.includes('grade-value">ผ<'));
+const summary=renderToStaticMarkup(createElement(ScoreSummary,{state,course:c,enrollment:e}));assert(!summary.includes('<span>กลางภาค</span>'));assert(!summary.includes('<span>ปลายภาค</span>'));assert(summary.includes('เกณฑ์ผ่าน 60'));assert(summary.includes('ผล ผ'));
+const exam=renderToStaticMarkup(createElement(Exams,{state,course:c,refresh:async()=>{},onStart:()=>{}}));assert(exam.includes('วิชากิจกรรม ไม่มีการสอบ'));assert(!exam.includes('สร้างข้อสอบ'));
+const rows=resultRows(state,c);assert.equal(rows[0]['เกรด'],'ผ');assert.equal(rows[0]['คะแนนรวม'],80);assert.equal(rows[0]['กลางภาค'],'');assert.equal(rows[0]['ปลายภาค'],'');
+console.log('PASS Activity pass/fail thresholds, no-exam completeness, hidden exam controls, score summaries and Excel result fields');
