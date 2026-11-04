@@ -1,3 +1,4 @@
+import {careActions,careStep,hats,accessories,islandProps} from './companion-play';
 import {personalities} from './adventure-plus';
 import {companions} from './adventure-catalog';
 import {all,one,stmt,fail,jsonBody,reply,integer,string} from './server';
@@ -26,7 +27,7 @@ async function activeStudent(u:User,courseId:string){
  const en=await one(`SELECT id FROM enrollments en WHERE course_id=? AND student_id=? AND active=1 AND deleted=0 AND NOT EXISTS(SELECT 1 FROM trash_entries t WHERE t.kind='enrollment' AND t.record_id=en.id)`,courseId,u.id);if(!en)fail(403,'การลงทะเบียนไม่ได้ใช้งาน');return c;
 }
 export async function adventureRoute(r:Request,u:User,path:string,method:string):Promise<Response|null>{
- const match=path.match(/^island\/([^/]+)(?:\/(community))?$/);if(!match)return null;
+ const match=path.match(/^island\/([^/]+)(?:\/(community|care))?$/);if(!match)return null;
  const c=match[2]==='community'&&['admin','teacher'].includes(u.role)?await ownCourse(u,match[1],true):await activeStudent(u,match[1]);
  if(match[2]==='community'&&method==='POST'){
   const b=await jsonBody(r);if(Object.keys(b).length)fail(400,'ภารกิจห้องคำนวณจากงานจริง ไม่รับคะแนนหรือระดับจากอุปกรณ์');
@@ -34,13 +35,21 @@ export async function adventureRoute(r:Request,u:User,path:string,method:string)
   if(current.stage>current.savedStage)await stmt(`INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value WHERE coalesce(CASE WHEN json_valid(settings.value) THEN json_extract(settings.value,'$.stage') ELSE 0 END,0)<?`,'class_island:'+c.id,JSON.stringify({stage:current.stage}),current.stage).run();
   return reply({challenge:(await classChallenges('c.id=?',[c.id]))[0]});
  }
- if(match[2])return null;
+ if(match[2]&&match[2]!=='care')return null;
  const key=profileKey(u.id,c.id),row=await one('SELECT value FROM settings WHERE key=?',key),current=profileValue(parse(row?.value));
+ if(match[2]==='care'&&method==='POST'){
+  const b=await jsonBody(r);if(!b||Object.keys(b).some(k=>!['expectedRevision','action'].includes(k))||!careActions.some(a=>a.id===b.action))fail(400,'เลือกกิจกรรมคู่หูจากรายการ');
+  const expected=integer(b.expectedRevision,'รุ่นข้อมูล',0,2147483647);if(expected!==current.revision)fail(409,'มีการแก้ไขจากอีกหน้าต่าง กรุณาโหลดข้อมูลล่าสุด');
+  if(current.careDone.includes(b.action))return reply({profile:current});const next={...current,...careStep(current,b.action),revision:current.revision+1};
+  const result=row?await stmt('UPDATE settings SET value=? WHERE key=? AND value=?',JSON.stringify(next),key,row.value).run():await stmt('INSERT INTO settings(key,value) SELECT ?,? WHERE NOT EXISTS(SELECT 1 FROM settings WHERE key=?)',key,JSON.stringify(next),key).run();if(!result.meta.changes)fail(409,'ข้อมูลเปลี่ยนระหว่างบันทึก กรุณาลองใหม่');return reply({profile:next});
+ }
+ if(match[2])return null;
  if(method==='GET')return reply({profile:current,challenge:(await classChallenges('c.id=?',[c.id]))[0]});
  if(method!=='PATCH')return null;
- const b=await jsonBody(r),keys=Object.keys(b);if(keys.some(k=>!['expectedRevision','companion','companionName','personality','houseColor','goalIds'].includes(k))||!keys.some(k=>k!=='expectedRevision'))fail(400,'ข้อมูลตั้งค่าเกาะไม่ถูกต้อง');
+ const b=await jsonBody(r),keys=Object.keys(b);if(keys.some(k=>!['hat','accessory','islandProp','expectedRevision','companion','companionName','personality','houseColor','goalIds'].includes(k))||!keys.some(k=>k!=='expectedRevision'))fail(400,'ข้อมูลตั้งค่าเกาะไม่ถูกต้อง');
  const expected=integer(b.expectedRevision,'รุ่นข้อมูล',0,2147483647);if(expected!==current.revision)fail(409,'มีการแก้ไขจากอีกหน้าต่าง กรุณาโหลดข้อมูลล่าสุดก่อนบันทึก');
  const next:IslandProfile={...current,revision:current.revision+1};
+ for(const [field,choices] of [['hat',hats],['accessory',accessories],['islandProp',islandProps]] as const){if(field in b){if(!choices.some(v=>v.id===b[field]))fail(400,'เลือกของตกแต่งจากรายการ');(next as any)[field]=b[field];}}
  if('companion' in b){if(!companions.some(c=>c.id===b.companion))fail(400,'เลือกคู่หูจากรายการ');next.companion=b.companion;}
  if('companionName' in b){if(typeof b.companionName!=='string'||b.companionName.trim().length>24||/[\x00-\x1f\x7f]/.test(b.companionName))fail(400,'ชื่อคู่หูต้องยาวไม่เกิน 24 ตัวอักษร');next.companionName=b.companionName.trim();}
  if('personality' in b){if(!personalities.some(p=>p.id===b.personality))fail(400,'เลือกบุคลิกจากรายการ');next.personality=b.personality;}
